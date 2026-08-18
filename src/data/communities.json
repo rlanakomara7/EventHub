@@ -1,0 +1,75 @@
+[
+  {
+    "id": 1,
+    "name": "Bandung Go Community",
+    "category": "Technology",
+    "members": 847,
+    "upcomingEvents": 3,
+    "description": "The premier Go programming community in Bandung.",
+    "image": "/C-Image(BandungGoCommunity).svg"
+  },
+  {
+    "id": 2,
+    "name": "Jakarta AI & ML Club",
+    "category": "AI",
+    "members": 2341,
+    "upcomingEvents": 5,
+    "description": "Researchers, practitioners, and enthusiasts exploring machine learning.",
+    "image": "/C-Image(JakartaAI&MLClub).svg"
+  },
+  {
+    "id": 3,
+    "name": "Indonesia Frontend Devs",
+    "category": "Programming",
+    "members": 5621,
+    "upcomingEvents": 4,
+    "description": "The largest frontend community in Indonesia.",
+    "image": "/C-Image(IndonesiaFrontendDevs).svg"
+  },
+  {
+    "id": 4,
+    "name": "Product Minds Indonesia",
+    "category": "Business",
+    "members": 1203,
+    "upcomingEvents": 2,
+    "description": "Product managers, designers, and builders sharing knowledge.",
+    "image": "/C-Image(ProductMindsIndonesia).svg"
+  },
+
+  {
+    "id": 5,
+    "name": "Creative Coders Collective",
+    "category": "Design",
+    "members": 934,
+    "upcomingEvents": 2,
+    "description": "Design and code intersect here — generative art, design systems, and creative development.",
+    "image": "/C-Image(CreativeCodersCollective).svg"
+  },
+  {
+    "id": 6,
+    "name": "Startup Founders Circle",
+    "category": "Business",
+    "members": 789,
+    "upcomingEvents": 3,
+    "description": "Early-stage founders in Indonesia supporting each other through fundraising, product, and growth.",
+    "image": "/C-Image(StartupFoundersCircle).svg"
+  },
+  {
+    "id": 7,
+    "name": "Data Science ID",
+    "category": "AI",
+    "members": 1567,
+    "upcomingEvents": 4,
+    "description": "Data scientists and analysts across Indonesia sharing datasets, papers, and practical ML.",
+    "image": "/C-Image(DataScienceID).svg"
+  },
+  {
+    "id": 8,
+    "name": "Music Tech Community",
+    "category": "Music",
+    "members": 445,
+    "upcomingEvents": 1,
+    "description": "Producers, sound engineers, and musicians who love blending technology with music.",
+    "image": "/C-Image(MusicTechCommunity).svg"
+  }
+]

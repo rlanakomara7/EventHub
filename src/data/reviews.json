@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "name": "Raisa Nurdiana",
+    "role": "Frontend Engineer",
+    "company": "Cakrawala Digital",
+    "initial": "RN",
+    "text": "EventHub completely changed how I network. I met my current co-founder at a Jakarta AI meetup I found here."
+  },
+  {
+    "id": 2,
+    "name": "Bimo Hartanto",
+    "role": "Product Manager",
+    "company": "Nusantara Labs",
+    "initial": "BH",
+    "text": "We used to manage event registrations over WhatsApp groups. Switching to EventHub has cut our admin overhead in half."
+  },
+  {
+    "id": 3,
+    "name": "Indira Kusuma",
+    "role": "UX Designer",
+    "company": "Kreasi Studio",
+    "initial": "IK",
+    "text": "I love that I can filter by city and category in one place. Found a design sprint workshop in Bandung I never would have discovered otherwise."
+  }
+]

@@ -2,4 +2,17 @@
 
 body {
   margin: 0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+@theme {
+  --color-orange-primary: #ff5f22;
+  --color-orange-secondary: #ff5f2214;
+  --color-black-primary: #111111;
+  --color-white-primary: #ffffffe5;
+  --color-white-secondary: #f4f4f5;
+  --color-gray-primary: #52525c;
+  --color-gray-secondary: #9f9fa9;
+  --color-green-primary: #33b570;
+  --color-green-secondary: #33b570;
 }
