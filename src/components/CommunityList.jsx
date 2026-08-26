@@ -1,11 +1,10 @@
 import CommunityCard from "./CommunityCard";
 
-function CommunityList({ communities, onAuthRequired }) {
+function CommunityList({ communities, onAuthRequired, events, onEventClick }) {
   return (
     <>
       <main
         className=" grid
-  grid
         grid-cols-1
         gap-4
         px-3 py-5

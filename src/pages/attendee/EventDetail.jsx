@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router";
 import { FiCalendar, FiClock, FiMapPin, FiUsers } from "react-icons/fi";
-import Header from "../../components/Header";
+import { useState } from "react"; // TAMBAH
 import events from "../../data/events.json";
 
 function EventDetail() {
@@ -10,17 +10,53 @@ function EventDetail() {
   // CARI EVENT SESUAI ID
   const event = events.find((event) => String(event.id) === String(id));
 
+  const [registered, setRegistered] = useState(() => {
+    const registeredEvents =
+      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+
+    return registeredEvents.some((item) => String(item.id) === String(id));
+  });
+
+  function handleRegister() {
+    // Ambil data registered dari localStorage
+    const registeredEvents =
+      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+
+    // Cek apakah event sudah ada
+    const alreadyRegistered = registeredEvents.some(
+      (item) => String(item.id) === String(event.id),
+    );
+
+    if (alreadyRegistered) {
+      const updatedEvents = registeredEvents.filter(
+        (item) => String(item.id) !== String(event.id),
+      );
+
+      localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
+
+      // ubah tombol menjadi Join Event
+      setRegistered(false);
+
+      return;
+    }
+
+    const updatedEvents = [...registeredEvents, event];
+
+    localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
+
+    // ubah tombol menjadi Registered
+    setRegistered(true);
+  }
+
   // JIKA EVENT TIDAK DITEMUKAN
   if (!event) {
     return (
       <>
-        <Header />
-
         <div className="p-10">
           <h1 className="text-2xl font-bold">Event not found</h1>
 
           <Link to="/event" className="mt-3 inline-block text-orange-primary">
-            Back to Events
+            ← Back to Events
           </Link>
         </div>
       </>
@@ -32,8 +68,6 @@ function EventDetail() {
 
   return (
     <>
-      <Header />
-
       {/* BACK */}
       <div className="border-b border-gray-200 px-4 py-4 md:px-10">
         <Link to="/event" className="text-sm text-gray-secondary">
@@ -168,12 +202,14 @@ function EventDetail() {
                 </div>
               </div>
 
-              {/* JOIN */}
               <button
                 type="button"
-                className="mt-4 w-full rounded-lg bg-orange-primary py-2.5 text-sm text-white-primary"
+                onClick={handleRegister}
+                className={`mt-4 w-full rounded-lg py-2.5 text-sm text-white-primary ${
+                  registered ? "bg-green-primary" : "bg-orange-primary"
+                }`}
               >
-                Join Event
+                {registered ? "Registered" : "Join Event"}
               </button>
 
               {/* ACTION */}

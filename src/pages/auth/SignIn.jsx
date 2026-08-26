@@ -1,14 +1,7 @@
-import AuthLayout from "../../components/AuthLayout";
 import AuthSignInForm from "../../components/AuthSignInForm";
 
 function SignIn() {
-  return (
-    <>
-      <AuthLayout>
-        <AuthSignInForm />
-      </AuthLayout>
-    </>
-  );
+  return <AuthSignInForm />;
 }
 
 export default SignIn;

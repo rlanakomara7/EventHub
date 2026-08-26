@@ -1,35 +1,37 @@
-function MyEventsFilter({ activeTab, setActiveTab }) {
+function MyProfileFilter({ activeTab, setActivetab }) {
   return (
-    <div className="max-w-7xl mx-auto px-6 mt-5 flex gap-7">
+    <div
+      className=" grid grid-cols-3
+      mt-8
+      text-center"
+    >
       <button
         type="button"
-        onClick={() => setActiveTab("upcoming")}
+        onClick={() => setActivetab("Events")}
         className={
-          activeTab === "upcoming"
+          activeTab === "Events"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
             : "px-2 pb-3 text-sm text-gray-secondary"
         }
       >
-        Upcoming
+        Events
       </button>
-
       <button
         type="button"
-        onClick={() => setActiveTab("past")}
+        onClick={() => setActivetab("Communities")}
         className={
-          activeTab === "past"
+          activeTab === "Communities"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
             : "px-2 pb-3 text-sm text-gray-secondary"
         }
       >
-        Past
+        Communities
       </button>
-
       <button
         type="button"
-        onClick={() => setActiveTab("saved")}
+        onClick={() => setActivetab("Saved")}
         className={
-          activeTab === "saved"
+          activeTab === "Saved"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
             : "px-2 pb-3 text-sm text-gray-secondary"
         }
@@ -40,4 +42,4 @@ function MyEventsFilter({ activeTab, setActiveTab }) {
   );
 }
 
-export default MyEventsFilter;
+export default MyProfileFilter;

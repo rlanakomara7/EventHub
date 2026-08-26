@@ -1,6 +1,6 @@
 function ReviewCard({ review }) {
   return (
-    <article className="rounded-xl border border-gray-200 bg-white-secondary p-5 shadow-sm">
+    <article className="rounded-xl border shadow-lg border-gray-200 bg-white-secondary p-5">
       <div className="mb-5">
         <p className="text-3xl font-bold leading-none text-orange-primary">"</p>
       </div>

@@ -1,12 +1,12 @@
-import Header from "../../components/Header";
+import { useOutletContext } from "react-router";
+import { useState } from "react";
 import SearchBar from "../../components/SearchBar";
 import EventList from "../../components/EventList";
 import events from "../../data/events.json";
-import ModalSign from "../../components/ModalSign";
-import { useState } from "react";
 
 function Event() {
-  //filter category
+  const { currentUser, handleEventClick, handleJoin } = useOutletContext();
+
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   // search filter
@@ -27,22 +27,9 @@ function Event() {
     // harus lolos search DAN category
     return matchSearch && matchCategory;
   });
-  // ----------------
-  const [showModal, setShowModal] = useState(false);
-
-  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-
-  //handle join if blm login
-  function handleJoin() {
-    if (!currentUser) {
-      setShowModal(true);
-      return;
-    }
-  }
 
   return (
     <>
-      <Header />
       <SearchBar
         search={search}
         setSearch={setSearch}
@@ -55,9 +42,11 @@ function Event() {
           <span className="text-gray-primary/40 font-medium"> Event Found</span>
         </p>
       </div>
-      <EventList events={eventsFiltered} onAuthRequired={handleJoin} />
-
-      {showModal && <ModalSign onClose={() => setShowModal(false)} />}
+      <EventList
+        events={eventsFiltered}
+        onAuthRequired={handleJoin}
+        onEventClick={handleEventClick}
+      />
     </>
   );
 }

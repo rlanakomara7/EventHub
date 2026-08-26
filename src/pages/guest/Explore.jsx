@@ -1,16 +1,17 @@
-import Header from "../../components/Header";
-import EventList from "../../components/Eventlist";
+import EventList from "../../components/EventList";
 import events from "../../data/events.json";
 import communities from "../../data/communities.json";
 import reviews from "../../data/reviews.json";
 import Hero from "../../components/Hero";
 import CommunityList from "../../components/CommunityList";
 import ReviewList from "../../components/ReviewList";
-import Footer from "../../components/Footer";
 import { useState } from "react";
-import ModalSign from "../../components/ModalSign";
+
+import { useOutletContext } from "react-router";
 
 function Explore() {
+  const { handleJoin, handleEventClick } = useOutletContext();
+
   const [search, setSearch] = useState("");
 
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -30,20 +31,8 @@ function Explore() {
     return matchSearch && matchCategory;
   });
 
-  const [showModal, setShowModal] = useState(false);
-
-  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
-
-  //handle join if blm login
-  function handleJoin() {
-    if (!currentUser) {
-      setShowModal(true);
-      return;
-    }
-  }
   return (
     <>
-      <Header title="Explore" />
       <Hero
         search={search}
         setSearch={setSearch}
@@ -55,7 +44,11 @@ function Explore() {
           <p className="px-1 text-lg font-bold md:px-5 md:text-2xl">
             Discover events that interest you
           </p>
-          <EventList events={eventsFiltered} onAuthRequired={handleJoin} />
+          <EventList
+            events={eventsFiltered}
+            onAuthRequired={handleJoin}
+            onEventClick={handleEventClick}
+          />
         </div>
         <div className="pt-10">
           <p className="px-5 font-bold text-2xl">Popular Communities</p>
@@ -63,6 +56,7 @@ function Explore() {
             communities={communities}
             onAuthRequired={handleJoin}
             events={eventsFiltered}
+            onEventClick={handleEventClick}
           />
         </div>
         <div className="pt-10  ">
@@ -70,8 +64,6 @@ function Explore() {
           <ReviewList reviews={reviews} />
         </div>
       </main>
-      <Footer />
-      {showModal && <ModalSign onClose={() => setShowModal(false)} />}
     </>
   );
 }

@@ -1,6 +1,11 @@
-function CommunityFilter() {
+function CommunityFilter({
+  selectedCategory,
+  setSelectedCategory,
+  selectedLocation,
+  setSelectedLocation,
+}) {
   const categories = [
-    "All Categories",
+    "All",
     "Technology",
     "Design",
     "Business",
@@ -10,69 +15,103 @@ function CommunityFilter() {
     "Music",
   ];
 
-  const filterStatus = ["All", "Joined", "Not Joined"];
+  const locations = [
+    "All Locations",
+    "Jakarta",
+    "Bandung",
+    "Surabaya",
+    "Yogyakarta",
+    "Online",
+  ];
+
   return (
     <>
       <div
-        className="flex
+        className="
+          flex
           flex-col
           gap-4
           px-3
           py-4
-
           md:flex-row
           md:items-center
           md:px-6
-
-          lg:px-10"
+          lg:px-10
+        "
       >
-        {/* FILTER STATUS */}
         <div
-          className=" flex
+          className="
+            flex
             shrink-0
             items-center
             rounded-lg
             border
             border-gray-200
             bg-white
-            p-1 "
+            p-1
+          "
         >
-          {filterStatus.map((status) => (
+          {locations.map((location) => (
             <button
-              key={status}
+              key={location}
               type="button"
-              className={`shrink-0 rounded-md px-3 py-2 text-xs md:px-4 md:text-sm ${
-                status === "All"
-                  ? "bg-orange-primary text-white-primary"
-                  : "text-gray-secondary"
-              }`}
+              // TAMBAH:
+              // ketika tombol diklik, ubah selectedLocation
+              onClick={() => setSelectedLocation(location)}
+              className={`
+                shrink-0
+                rounded-md
+                px-3
+                py-2
+                text-xs
+                md:px-4
+                md:text-sm
+
+                ${
+                  selectedLocation === location
+                    ? "bg-orange-primary text-white-primary"
+                    : "text-gray-secondary"
+                }
+              `}
             >
-              {status}
+              {location}
             </button>
           ))}
         </div>
 
-        {/* FILTER CATEGORY */}
         <div
           className="
-    flex
-    w-full
-    max-w-full
-    gap-2
-    overflow-x-auto
-    whitespace-nowrap
-    pb-1
-  "
+            flex
+            w-full
+            max-w-full
+            gap-2
+            overflow-x-auto
+            whitespace-nowrap
+            pb-1
+          "
         >
           {categories.map((category) => (
             <button
               key={category}
               type="button"
-              className={`shrink-0 rounded-md px-3 py-2 text-xs md:px-4 md:text-sm ${
-                category === "All Categories"
-                  ? "bg-orange-primary text-white-primary"
-                  : "text-gray-secondary"
-              }`}
+              // TAMBAH:
+              // ketika category diklik
+              onClick={() => setSelectedCategory(category)}
+              className={`
+                shrink-0
+                rounded-md
+                px-3
+                py-2
+                text-xs
+                md:px-4
+                md:text-sm
+
+                ${
+                  selectedCategory === category
+                    ? "bg-orange-primary text-white-primary"
+                    : "text-gray-secondary"
+                }
+              `}
             >
               {category}
             </button>

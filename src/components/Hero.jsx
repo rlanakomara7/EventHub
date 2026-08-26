@@ -1,4 +1,5 @@
 import { CiSearch } from "react-icons/ci";
+import { useSearchParams } from "react-router";
 
 function Hero({ search, setSearch, selectedCategory, setSelectedCategory }) {
   const categories = [
@@ -10,37 +11,23 @@ function Hero({ search, setSearch, selectedCategory, setSelectedCategory }) {
     "Music",
   ];
 
+  const [searchParam, useSearchParam] = useSearchParams();
+
+  function CreateParam(key, url) {
+    const find = new URLSearchParams(searchParam);
+    if (find.has(key)) {
+      find.set(key, url);
+    } else {
+      find.append(key, url);
+    }
+    useSearchParam(find);
+  }
+
   return (
     <>
-      <section
-        className="  mb-6
-  min-h-[420px]
-  px-4
-  flex flex-col
-  items-center
-  gap-4
-  bg-black-primary
-  text-white-primary
-  bg-radial
-  from-orange-600/20
-  from-0%
-  via-orange-500/10
-  via-35%
-  to-transparent
-  to-70%
-  md:min-h-[440px]"
-      >
+      <section className="mb-6 min-h-[420px] px-4 flex flex-col items-center gap-4 bg-black-primary text-white-primary bg-radial from-orange-600/20 from-0% via-orange-500/10 via-35% to-transparent to-70% md:min-h-[440px]">
         <div className=" flex justify-center">
-          <p
-            className=" my-6
-    rounded-full
-    border border-orange-primary/20
-    bg-orange-primary/5
-    px-4 py-2
-    text-sm font-semibold
-    text-orange-primary
-    backdrop-blur-sm"
-          >
+          <p className=" my-6 rounded-full border border-orange-primary/20 bg-orange-primary/5 px-4 py-2 text-sm font-semibold text-orange-primary backdrop-blur-sm">
             Discover . Connect . Participate
           </p>
         </div>
@@ -66,7 +53,10 @@ function Hero({ search, setSearch, selectedCategory, setSelectedCategory }) {
                 placeholder="Search events, topics, or locations..."
                 className="w-full bg-white-secondary py-2 pl-9 pr-3 outline-none text-black-primary placeholder:text-gray-primary"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  CreateParam("search", e.target.value);
+                  setSearch(e.target.value);
+                }}
               />
             </div>
 

@@ -5,11 +5,18 @@ import { Link } from "react-router";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
+//redux
+import { useAppDispatch } from "../hooks/reduxHooks";
+import { login } from "../redux/slice/authSlice";
+
 function AuthSignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+
+  //redux
+  const dispatch = useAppDispatch();
 
   const navigate = useNavigate();
 
@@ -34,6 +41,17 @@ function AuthSignInForm() {
 
     const users = JSON.parse(localStorage.getItem("users")) || [];
 
+    let admin = import.meta.env.VITE_ADMIN;
+
+    let organizer = import.meta.env.VITE_ORGANIZER;
+
+    admin = JSON.parse(admin);
+    organizer = JSON.parse(organizer);
+
+    users.push(admin);
+
+    users.push(organizer);
+
     const user = users.find(
       (user) => user.email === email && user.password === password,
     );
@@ -45,7 +63,8 @@ function AuthSignInForm() {
       return;
     }
 
-    localStorage.setItem("currentUser", JSON.stringify(user));
+    //redux
+    dispatch(login(user));
 
     navigate("/explore");
   }

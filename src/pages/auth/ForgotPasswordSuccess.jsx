@@ -1,12 +1,7 @@
-import AuthLayout from "../../components/AuthLayout";
 import AuthForgotSucces from "../../components/AuthForgotSucces";
 
 function ForgotPasswordSucces() {
-  return (
-    <AuthLayout>
-      <AuthForgotSucces />
-    </AuthLayout>
-  );
+  return <AuthForgotSucces />;
 }
 
 export default ForgotPasswordSucces;

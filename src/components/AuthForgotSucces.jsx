@@ -1,7 +1,7 @@
 import { FiCheck } from "react-icons/fi";
 import { Link } from "react-router";
 
-function AuthForgotSucces() {
+function AuthForgotSuccess() {
   return (
     <div className="flex flex-col items-center text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
@@ -24,4 +24,4 @@ function AuthForgotSucces() {
   );
 }
 
-export default AuthForgotSucces;
+export default AuthForgotSuccess;

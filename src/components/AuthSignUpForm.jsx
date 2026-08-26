@@ -70,6 +70,7 @@ function AuthSignUpForm() {
       name: fullName,
       email: email,
       password: password,
+      role: "attendee",
       image: "/Default-Avatar.svg",
     };
 

@@ -27,17 +27,11 @@ function Footer() {
         </p>
 
         <div className="mt-6 flex justify-center gap-3">
-          <a
-            href=""
-            className="rounded-lg bg-orange-primary px-6 py-3 text-sm font-semibold text-white-primary"
-          >
+          <a className="rounded-lg bg-orange-primary px-6 py-3 text-sm font-semibold text-white-primary">
             Explore Events
           </a>
 
-          <a
-            href=""
-            className="rounded-lg border border-gray-secondary/30 bg-transparent px-6 py-3 text-sm font-semibold text-gray-secondary"
-          >
+          <a className="rounded-lg border border-gray-secondary/30 bg-transparent px-6 py-3 text-sm font-semibold text-gray-secondary">
             Browse Communities
           </a>
         </div>

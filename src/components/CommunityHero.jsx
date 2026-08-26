@@ -1,11 +1,20 @@
 import { CiSearch } from "react-icons/ci";
 
-function CommunityHero() {
+function CommunityHero({ search, setSearch }) {
+  function CreateParam(key, url) {
+    const find = new URLSearchParams(searchParam);
+    if (find.has(key)) {
+      find.set(key, url);
+    } else {
+      find.append(key, url);
+    }
+    useSearchParam(find);
+  }
   return (
     <section
-      className="bg-black-primary
-        px-4 py-8
-        text-white-primary
+      className="bg-black-primary 
+        px-4 py-8 
+        text-white-primary 
         md:px-6 md:py-12"
     >
       <h1 className="text-center text-2xl font-bold md:text-3xl">
@@ -14,11 +23,11 @@ function CommunityHero() {
 
       <p
         className="
-          mx-auto mt-2
-          max-w-2xl
-          text-center
-          text-xs leading-5
-          text-gray-secondary
+          mx-auto mt-2 
+          max-w-2xl 
+          text-center 
+          text-xs leading-5 
+          text-gray-secondary 
           md:text-sm
         "
       >
@@ -33,6 +42,11 @@ function CommunityHero() {
           <input
             type="search"
             placeholder="Search communities..."
+            // TAMBAH
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+            }}
             className="w-full rounded-xl bg-white-secondary py-3 pl-11 pr-4 text-black-primary outline-none placeholder:text-gray-primary"
           />
         </div>

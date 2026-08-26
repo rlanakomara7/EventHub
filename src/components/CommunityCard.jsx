@@ -1,10 +1,16 @@
 import { MdPeopleAlt } from "react-icons/md";
 import { FiCalendar } from "react-icons/fi";
+import { useNavigate } from "react-router";
 
 function CommunityCard({ community, onAuthRequired }) {
+  const navigate = useNavigate();
+  console.log("Community Detail Loaded");
   return (
-    <article className="overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
-      <div className="h-44 w-full overflow-hidden">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
+      <div
+        className="h-44 w-full overflow-hidden cursor-pointer"
+        onClick={() => navigate(`/communities/${community.id}`)}
+      >
         <img
           src={community.image}
           alt={community.name}
@@ -12,8 +18,11 @@ function CommunityCard({ community, onAuthRequired }) {
         />
       </div>
 
-      <div className="space-y-3 px-4 py-4">
-        <h3 className="text-lg font-semibold text-gray-900">
+      <div className="flex flex-1 flex-col space-y-3 px-4 py-4">
+        <h3
+          className="cursor-pointer text-lg font-semibold text-gray-900"
+          onClick={() => navigate(`/communities/${community.id}`)}
+        >
           {community.name}
         </h3>
 
@@ -29,19 +38,19 @@ function CommunityCard({ community, onAuthRequired }) {
 
         <div className="flex items-center gap-4 text-xs text-gray-secondary">
           <div className="flex items-center gap-1">
-            <MdPeopleAlt className="text-sm" />
+            <MdPeopleAlt />
             <span>{community.members.toLocaleString("id-ID")} members</span>
           </div>
 
           <div className="flex items-center gap-1">
-            <FiCalendar className="text-sm" />
+            <FiCalendar />
             <span>{community.upcomingEvents} upcoming</span>
           </div>
         </div>
 
         <button
           type="button"
-          className="w-full rounded-lg bg-orange-primary py-2 text-sm font-medium text-white-secondary transition hover:opacity-90"
+          className="mt-auto w-full rounded-lg bg-orange-primary py-2 text-sm font-medium text-white-secondary"
           onClick={onAuthRequired}
         >
           Join Community
