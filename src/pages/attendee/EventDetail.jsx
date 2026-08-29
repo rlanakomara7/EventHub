@@ -1,6 +1,15 @@
 import { Link, useParams } from "react-router";
-import { FiCalendar, FiClock, FiMapPin, FiUsers } from "react-icons/fi";
-import { useState } from "react"; // TAMBAH
+import {
+  FiCalendar,
+  FiClock,
+  FiMapPin,
+  FiUsers,
+  FiMessageCircle,
+  FiSend,
+} from "react-icons/fi";
+import { useState } from "react";
+import { useSelector } from "react-redux";
+import { selectUser } from "../../redux/slice/authSlice";
 import events from "../../data/events.json";
 
 function EventDetail() {
@@ -10,6 +19,59 @@ function EventDetail() {
   // CARI EVENT SESUAI ID
   const event = events.find((event) => String(event.id) === String(id));
 
+  // komentar
+  const user = useSelector(selectUser);
+
+  const [comments, setComments] = useState(() => {
+    const savedComments = JSON.parse(
+      localStorage.getItem(`eventComments_${id}`),
+    );
+
+    return (
+      savedComments || [
+        {
+          id: 1,
+          author: "Dian Purnama",
+          text: "Super excited for this event!",
+          time: "2d ago",
+        },
+        {
+          id: 2,
+          author: "Ahmad Fauzan",
+          text: "Bring your laptop and get ready for the workshop.",
+          time: "1d ago",
+        },
+      ]
+    );
+  });
+  const [comment, setComment] = useState("");
+
+  function handleAddComment(e) {
+    e.preventDefault();
+
+    const trimmedComment = comment.trim();
+
+    if (!trimmedComment) return;
+
+    const newComment = {
+      id: Date.now(),
+      author: user?.name || "User",
+      text: trimmedComment,
+      time: "Just now",
+    };
+
+    const updatedComments = [...comments, newComment];
+
+    setComments(updatedComments);
+    setComment("");
+
+    localStorage.setItem(
+      `eventComments_${id}`,
+      JSON.stringify(updatedComments),
+    );
+  }
+
+  // ------------
   const [registered, setRegistered] = useState(() => {
     const registeredEvents =
       JSON.parse(localStorage.getItem("registeredEvents")) || [];
@@ -132,25 +194,57 @@ function EventDetail() {
 
             {/* DISCUSSION */}
             <section className="mt-7">
-              <h2 className="font-semibold">Discussion</h2>
+              <h2 className="flex items-center gap-2 font-semibold">
+                {" "}
+                <FiMessageCircle />
+                Discussion
+                <span className="text-sm font-normal text-gray-secondary">
+                  ({comments.length})
+                </span>
+              </h2>
 
               <div className="mt-3 space-y-3">
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-sm font-medium">Dian Purnama</p>
+                {comments.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-gray-200 p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{item.author}</p>
 
-                  <p className="mt-1 text-sm text-gray-secondary">
-                    Super excited for this event!
-                  </p>
-                </div>
+                      <span className="text-xs text-gray-secondary">
+                        {item.time}
+                      </span>
+                    </div>
 
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="text-sm font-medium">Ahmad Fauzan</p>
-
-                  <p className="mt-1 text-sm text-gray-secondary">
-                    Bring your laptop and get ready for the workshop.
-                  </p>
-                </div>
+                    <p className="mt-1 text-sm text-gray-secondary">
+                      {item.text}
+                    </p>
+                  </div>
+                ))}
               </div>
+
+              {/* form diskusi */}
+              <form
+                onSubmit={handleAddComment}
+                className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2"
+              >
+                <input
+                  type="text"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add to the discussion..."
+                  className="flex-1 bg-transparent text-sm outline-none"
+                />
+
+                <button
+                  type="submit"
+                  className="text-orange-primary"
+                  aria-label="Send comment"
+                >
+                  <FiSend />
+                </button>
+              </form>
             </section>
           </div>
 

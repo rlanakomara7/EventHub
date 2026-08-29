@@ -30,7 +30,7 @@ function EventCard({
 
   return (
     <>
-      <article className="overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
+      <article className="flex flex-col h-full overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
         <div onClick={() => onEventClick(event.id)} className="cursor-pointer">
           <img
             src={event.image}
@@ -80,7 +80,7 @@ function EventCard({
             </div>
           </div>
         </div>
-        <div className="flex flex-row items-center gap-2 text-gray-secondary px-4 py-2 ">
+        <div className="flex flex-row items-center gap-2 text-gray-secondary px-4 py-4 ">
           <button
             className={`flex-1 rounded-xl p-1 text-center text-white-secondary ${
               registered ? "bg-green-primary" : "bg-orange-primary"

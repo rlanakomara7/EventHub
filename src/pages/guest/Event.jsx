@@ -36,17 +36,30 @@ function Event() {
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
       />
-      <div className="px-10">
-        <p className="font-bold">
-          {eventsFiltered.length}{" "}
-          <span className="text-gray-primary/40 font-medium"> Event Found</span>
-        </p>
+      <div className="px-14">
+        <div className="px-1 py-5">
+          <p className="font-bold text-lg">
+            {eventsFiltered.length}{" "}
+            <span className="text-gray-primary/40 font-medium">
+              {" "}
+              events found{" "}
+            </span>
+          </p>
+        </div>
+        <EventList
+          events={eventsFiltered}
+          onAuthRequired={handleJoin}
+          onEventClick={handleEventClick}
+        />
+        <div className="flex justify-center mt-6 mb-6">
+          <button
+            type="button"
+            className="rounded-xl border border-gray-secondary/40 px-6 py-2 text-slate-600 font-semibold"
+          >
+            Load more events
+          </button>
+        </div>
       </div>
-      <EventList
-        events={eventsFiltered}
-        onAuthRequired={handleJoin}
-        onEventClick={handleEventClick}
-      />
     </>
   );
 }

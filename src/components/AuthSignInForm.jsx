@@ -64,7 +64,14 @@ function AuthSignInForm() {
     }
 
     //redux
-    dispatch(login(user));
+    dispatch(
+      login({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role || user.user_type || "attendee",
+      }),
+    );
 
     navigate("/explore");
   }

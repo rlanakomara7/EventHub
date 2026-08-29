@@ -1,6 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-//redux persist
+//persist local storage
 const initialState = {
   user: JSON.parse(localStorage.getItem("currentUser")) || null,
 };
@@ -30,5 +30,6 @@ const authSlice = createSlice({
 });
 
 export const { login, logout } = authSlice.actions;
+export const selectUser = (state) => state.auth.user;
 
 export default authSlice.reducer;

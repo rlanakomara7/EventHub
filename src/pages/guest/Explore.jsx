@@ -6,11 +6,20 @@ import Hero from "../../components/Hero";
 import CommunityList from "../../components/CommunityList";
 import ReviewList from "../../components/ReviewList";
 import { useState } from "react";
-
+import { useSelector } from "react-redux";
+import { selectUser } from "../../redux/slice/authSlice";
 import { useOutletContext } from "react-router";
+import Footer from "../../components/Footer";
 
 function Explore() {
   const { handleJoin, handleEventClick } = useOutletContext();
+
+  const user = useSelector(selectUser);
+
+  const role = user?.role;
+
+  console.log("USER:", user);
+  console.log("ROLE:", role);
 
   const [search, setSearch] = useState("");
 
@@ -39,19 +48,41 @@ function Explore() {
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
       />
-      <main className="px-3 md:px-5">
+      <main className="mx-auto w-full px-14">
         <div>
-          <p className="px-1 text-lg font-bold md:px-5 md:text-2xl">
-            Discover events that interest you
-          </p>
+          <div className="flex justify-between items-center">
+            {role === "attendee" ? (
+              <div className="mb-6">
+                <p className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase text-orange-primary">
+                  ↗ Recommended For You
+                </p>
+                <p className="text-lg font-bold md:text-2xl">
+                  Because you joined{" "}
+                  <span className="text-orange-primary">
+                    Bandung Go Community
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="px-1 text-lg font-bold md:text-2xl mb-4">
+                Discover events that interest you
+              </p>
+            )}
+
+            <button className="text-slate-400">See all → </button>
+          </div>
+
           <EventList
             events={eventsFiltered}
             onAuthRequired={handleJoin}
             onEventClick={handleEventClick}
           />
         </div>
-        <div className="pt-10">
-          <p className="px-5 font-bold text-2xl">Popular Communities</p>
+        <div className="pt-17">
+          <div className="flex justify-between items-center">
+            <p className="px-1 font-bold text-2xl ">Popular Communities</p>
+            <button className="text-slate-400">See all → </button>
+          </div>
           <CommunityList
             communities={communities}
             onAuthRequired={handleJoin}
@@ -60,10 +91,13 @@ function Explore() {
           />
         </div>
         <div className="pt-10  ">
-          <p className="px-5 font-bold text-2xl">What the community says</p>
+          <p className="px-1 mb-4 font-bold text-2xl">
+            What the community says
+          </p>
           <ReviewList reviews={reviews} />
         </div>
       </main>
+      <Footer />
     </>
   );
 }

@@ -1,15 +1,15 @@
 import { Outlet } from "react-router";
 import Header from "../components/Header";
-import Footer from "../components/Footer";
 
 function AttendeeLayout() {
+  const handleJoin = () => {};
+  const handleEventClick = () => {};
   return (
     <div>
       <Header />
       <main>
-        <Outlet />
+        <Outlet context={{ handleJoin, handleEventClick }} />
       </main>
-      <Footer />
     </div>
   );
 }

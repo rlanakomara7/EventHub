@@ -1,15 +1,16 @@
 import { Outlet, useNavigate } from "react-router";
 import { useState } from "react";
+import { useSelector } from "react-redux";
+import { selectUser } from "../redux/slice/authSlice";
 
 //component
 import Header from "../components/Header";
 import ModalSign from "../components/ModalSign";
-import Footer from "../components/Footer";
 
 function GuestLayout() {
   const [showModal, setShowModal] = useState(false);
 
-  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+  const currentUser = useSelector(selectUser);
 
   const navigate = useNavigate();
 
@@ -24,7 +25,7 @@ function GuestLayout() {
     const registeredEvents =
       JSON.parse(localStorage.getItem("registeredEvents")) || [];
 
-    // Cek apakah event sudah ada
+    // Cek event
     const alreadyRegistered = registeredEvents.some(
       (item) => item.id === event.id,
     );
@@ -66,7 +67,6 @@ function GuestLayout() {
           }}
         />
       </main>
-      <Footer />
       {showModal && <ModalSign onClose={() => setShowModal(false)} />}
     </div>
   );

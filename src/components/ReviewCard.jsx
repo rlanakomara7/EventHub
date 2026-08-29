@@ -1,6 +1,6 @@
 function ReviewCard({ review }) {
   return (
-    <article className="rounded-xl border shadow-lg border-gray-200 bg-white-secondary p-5">
+    <article className="flex flex-col h-full mt-auto rounded-xl border shadow-lg border-gray-200 bg-white-secondary p-5">
       <div className="mb-5">
         <p className="text-3xl font-bold leading-none text-orange-primary">"</p>
       </div>
@@ -9,7 +9,7 @@ function ReviewCard({ review }) {
         {review.text}
       </p>
 
-      <div className="flex items-center gap-3">
+      <div className=" mt-auto flex items-center gap-3 border-t border-gray-200 pt-4">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
           {review.initial}
         </div>

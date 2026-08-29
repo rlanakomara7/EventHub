@@ -6,7 +6,7 @@ function CommunityCard({ community, onAuthRequired }) {
   const navigate = useNavigate();
   console.log("Community Detail Loaded");
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
+    <article className="flex flex-col h-full overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
       <div
         className="h-44 w-full overflow-hidden cursor-pointer"
         onClick={() => navigate(`/communities/${community.id}`)}
@@ -18,7 +18,7 @@ function CommunityCard({ community, onAuthRequired }) {
         />
       </div>
 
-      <div className="flex flex-1 flex-col space-y-3 px-4 py-4">
+      <div className="flex flex-col flex-1 space-y-3 px-4 py-4">
         <h3
           className="cursor-pointer text-lg font-semibold text-gray-900"
           onClick={() => navigate(`/communities/${community.id}`)}
@@ -26,11 +26,11 @@ function CommunityCard({ community, onAuthRequired }) {
           {community.name}
         </h3>
 
-        <p className="text-sm leading-5 text-gray-secondary">
+        <p className="h-10 line-clamp-2 text-sm leading-5 text-gray-secondary">
           {community.description}
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-auto flex flex-wrap gap-2">
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-500">
             {community.category}
           </span>

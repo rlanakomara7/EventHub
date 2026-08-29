@@ -18,7 +18,7 @@ function MyProfileFilter({ activeTab, setActivetab }) {
       </button>
       <button
         type="button"
-        onClick={() => setActivetab("Communities")}
+        onClick={() => setActivetab("communities")}
         className={
           activeTab === "Communities"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
@@ -29,7 +29,7 @@ function MyProfileFilter({ activeTab, setActivetab }) {
       </button>
       <button
         type="button"
-        onClick={() => setActivetab("Saved")}
+        onClick={() => setActivetab("saved")}
         className={
           activeTab === "Saved"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"

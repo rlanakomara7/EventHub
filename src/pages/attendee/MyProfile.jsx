@@ -45,13 +45,13 @@ function MyProfile() {
 
             {/* Detail */}
             <div className="flex flex-col">
-              <h2 className="font-bold text-2xl">Rama Lana K</h2>
+              <h2 className="font-bold text-2xl">Rama</h2>
 
-              <p className="text-gray-500">rama@gmail.com</p>
+              <p className="text-gray-500">Rama@gmail.com</p>
 
               {/* data */}
               <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                <span>📍 Bandung, Indonesia</span>
+                <span>📍Indonesia</span>
 
                 <span>▣ Joined March 2025</span>
 

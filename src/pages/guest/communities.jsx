@@ -56,17 +56,19 @@ function Communities() {
         setSelectedLocation={setSelectedLocation}
       />
 
-      <div className="px-3 md:px-6 lg:px-10">
+      <div className="px-3 md:px-6 lg:px-12">
         <p className="text-sm font-bold md:text-base">
           {communitiesFiltered.length}{" "}
           <span className="font-medium text-gray-primary/40">Communities</span>
         </p>
       </div>
 
-      <CommunityList
-        communities={communitiesFiltered}
-        onAuthRequired={handleJoin}
-      />
+      <div className="px-12">
+        <CommunityList
+          communities={communitiesFiltered}
+          onAuthRequired={handleJoin}
+        />
+      </div>
 
       {showModal && <ModalSign onClose={() => setShowModal(false)} />}
     </>
