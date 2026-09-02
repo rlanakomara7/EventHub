@@ -4,6 +4,7 @@ import { useState } from "react";
 import MobileMenu from "./MobileMenu";
 import { RxDashboard } from "react-icons/rx";
 import { FiShield } from "react-icons/fi";
+import ModalLogout from "./ModalLogout";
 
 //redux
 import { useAppSelector, useAppDispatch } from "../hooks/reduxHooks";
@@ -12,15 +13,13 @@ import { logout } from "../redux/slice/authSlice";
 function Header() {
   const navigate = useNavigate();
 
+  //logoutmodal
+  const [logoutModal, setLogoutModal] = useState(false);
+
   //mobile
   const [isOpen, setIsOpen] = useState(false);
   //profile
   const [profileOpen, setProfileOpen] = useState(false);
-
-  // const [currentUser, setCurrentUser] = useState(() => {
-  //   const user = localStorage.getItem("currentUser");
-  //   return user ? JSON.parse(user) : null;
-  // });
 
   //redux
   const currentUser = useAppSelector((state) => state.auth.user);
@@ -33,15 +32,6 @@ function Header() {
 
     navigate("/signin");
   }
-
-  // console.log(currentUser?.role);
-  // // Handle logout
-  // function handleLogout() {
-  //   localStorage.removeItem("currentUser");
-  //   setCurrentUser(null);
-  //   setIsOpen(false);
-  //   navigate("/signin");
-  // }
 
   return (
     <>
@@ -97,7 +87,7 @@ function Header() {
               </NavLink>
 
               {/* ATTENDEE ONLY */}
-              {currentUser && (
+              {currentUser?.role === "attendee" && (
                 <NavLink
                   to="/myevents"
                   className={({ isActive }) =>
@@ -129,7 +119,7 @@ function Header() {
             )}
             {currentUser?.role === "admin" && (
               <Link
-                to="/overview"
+                to="/admin"
                 className="flex flex-row items-center gap-1 bg-orange-secondary px-3.5 py-2 text-orange-primary  rounded-lg "
               >
                 <FiShield />
@@ -158,9 +148,19 @@ function Header() {
             ) : (
               <>
                 {/* ATTENDEE */}
-                <button type="button">
-                  <FiBell className="h-5 w-5 text-gray-secondary" />
-                </button>
+                <NavLink
+                  to="/notification"
+                  aria-label="Open notifications"
+                  className={({ isActive }) =>
+                    `relative ${isActive ? "text-orange-primary bg-orange-primary/20 p-2 rounded-lg" : "text-gray-secondary"}`
+                  }
+                >
+                  {({ isActive }) => (
+                    <FiBell
+                      className={`h-5 w-5 ${isActive ? "text-orange-primary" : ""}`}
+                    />
+                  )}
+                </NavLink>
                 <button type="button">
                   <img src="/moon-svgrepo-com.svg" alt="Moon" className="w-5" />
                 </button>
@@ -203,10 +203,10 @@ function Header() {
 
                       <button
                         type="button"
-                        onClick={handleLogout}
+                        onClick={() => setLogoutModal(true)}
                         className=" w-full text-left px-5 py-3 text-sm text-red-500 hover:bg-red-50 "
                       >
-                        Sign Out
+                        Logout
                       </button>
                     </div>
                   )}
@@ -259,6 +259,12 @@ function Header() {
           />
         )}
       </header>
+      {logoutModal && (
+        <ModalLogout
+          onCancel={() => setLogoutModal(false)}
+          onConfirm={handleLogout}
+        />
+      )}
     </>
   );
 }

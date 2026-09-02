@@ -40,7 +40,7 @@ function MobileMenu({ currentUser, onClose, onLogout }) {
           Communities
         </NavLink>
 
-        {currentUser && (
+        {currentUser?.role === "attendee" && (
           <>
             <NavLink
               to="/myevents"

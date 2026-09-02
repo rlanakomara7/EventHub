@@ -1,9 +1,7 @@
-import React from 'react'
+import EventForm from "./EventForm";
 
 function CreateEvent() {
-  return (
-    <div>CreateEvent</div>
-  )
+  return <EventForm mode="create" />;
 }
 
-export default CreateEvent
+export default CreateEvent;

@@ -70,6 +70,9 @@ function AuthSignInForm() {
         name: user.name,
         email: user.email,
         role: user.role || user.user_type || "attendee",
+        location: user.location || "Indonesia",
+        bio: user.bio || "",
+        avatar: user.avatar || "/SON_9681.JPG",
       }),
     );
 

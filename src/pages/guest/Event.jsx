@@ -1,16 +1,23 @@
 import { useOutletContext } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import SearchBar from "../../components/SearchBar";
 import EventList from "../../components/EventList";
-import events from "../../data/events.json";
+import { getEvents } from "../../utils/eventStorage";
 
 function Event() {
-  const { currentUser, handleEventClick, handleJoin } = useOutletContext();
+  const { handleEventClick, handleJoin } = useOutletContext();
 
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   // search filter
   const [search, setSearch] = useState("");
+
+  // Ambil data dari localStorage lewat getEvents()
+  const [events, setEvents] = useState(() => getEvents());
+
+  useEffect(() => {
+    setEvents(getEvents());
+  }, []);
 
   const eventsFiltered = events.filter((event) => {
     const keyword = search.toLowerCase();

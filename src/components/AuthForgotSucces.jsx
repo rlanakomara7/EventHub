@@ -9,12 +9,12 @@ function AuthForgotSuccess() {
       </div>
 
       <h1 className="mt-5 text-2xl font-bold text-black-primary">
-        Check your email
+        Your password has been updated successfully...
       </h1>
 
       <p className="mt-2 text-sm text-gray-secondary">
-        We sent a reset link to{" "}
-        <span className="font-semibold text-black-primary">a@mail.com</span>
+        Check your email . We sent a reset link to{" "}
+        <span className="font-semibold text-black-primary">your@mail.com</span>
       </p>
 
       <Link to="/signin" className="mt-6 text-sm text-orange-primary">

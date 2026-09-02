@@ -1,39 +1,37 @@
-function MyProfileFilter({ activeTab, setActivetab }) {
+function MyProfileFilter({ activeTab, setActiveTab }) {
   return (
-    <div
-      className=" grid grid-cols-3
-      mt-8
-      text-center"
-    >
+    <div className="mt-8 grid grid-cols-3 text-center">
       <button
         type="button"
-        onClick={() => setActivetab("Events")}
+        onClick={() => setActiveTab("events")}
         className={
-          activeTab === "Events"
+          activeTab === "events"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
+            : "border-b-2 border-transparent px-2 pb-3 text-sm text-gray-secondary"
         }
       >
         Events
       </button>
+
       <button
         type="button"
-        onClick={() => setActivetab("communities")}
+        onClick={() => setActiveTab("communities")}
         className={
-          activeTab === "Communities"
+          activeTab === "communities"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
+            : "border-b-2 border-transparent px-2 pb-3 text-sm text-gray-secondary"
         }
       >
         Communities
       </button>
+
       <button
         type="button"
-        onClick={() => setActivetab("saved")}
+        onClick={() => setActiveTab("saved")}
         className={
-          activeTab === "Saved"
+          activeTab === "saved"
             ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
+            : "border-b-2 border-transparent px-2 pb-3 text-sm text-gray-secondary"
         }
       >
         Saved

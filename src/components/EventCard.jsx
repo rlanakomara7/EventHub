@@ -6,10 +6,10 @@ import { useState, useEffect } from "react";
 
 function EventCard({
   event,
-  onAuthRequired,
-  onEventClick,
+  onAuthRequired = () => {},
+  onEventClick = () => {},
+  onSavedChange = () => {},
   isRegistered = false,
-  // onUnregister,
 }) {
   //state
   const [registered, setRegistered] = useState(isRegistered);
@@ -24,9 +24,39 @@ function EventCard({
     );
 
     setRegistered(alreadyRegistered);
-  }, [event.id]);
+  }, [event.id, isRegistered]);
 
   const percentage = (event.attendees / event.capacity) * 100;
+
+  const [saved, setSaved] = useState(() => {
+    const savedEvents = JSON.parse(localStorage.getItem("savedEvents")) || [];
+
+    return savedEvents.some((item) => String(item.id) === String(event.id));
+  });
+
+  // REVISI 3: fungsi Save dan Unsave
+  function handleSave(e) {
+    e.stopPropagation();
+
+    const savedEvents = JSON.parse(localStorage.getItem("savedEvents")) || [];
+
+    const alreadySaved = savedEvents.some(
+      (item) => String(item.id) === String(event.id),
+    );
+
+    const updatedEvents = alreadySaved
+      ? savedEvents.filter((item) => String(item.id) !== String(event.id))
+      : [...savedEvents, event];
+
+    const nextSaved = !alreadySaved;
+
+    localStorage.setItem("savedEvents", JSON.stringify(updatedEvents));
+
+    setSaved(nextSaved);
+
+    // card langsung hilang
+    onSavedChange(event, nextSaved);
+  }
 
   return (
     <>
@@ -82,6 +112,7 @@ function EventCard({
         </div>
         <div className="flex flex-row items-center gap-2 text-gray-secondary px-4 py-4 ">
           <button
+            type="button"
             className={`flex-1 rounded-xl p-1 text-center text-white-secondary ${
               registered ? "bg-green-primary" : "bg-orange-primary"
             }`}
@@ -102,8 +133,15 @@ function EventCard({
           >
             {registered ? "Registered" : "Join Event"}
           </button>
-          <button typeof="submit" className="items-center">
-            <FaBookmark className="text-2xl" />
+          <button
+            type="button"
+            className="items-center"
+            onClick={handleSave}
+            aria-label={saved ? "Unsave event" : "Save event"}
+          >
+            <FaBookmark
+              className={`text-2xl ${saved ? "text-orange-primary" : "text-gray-400"}`}
+            />
           </button>
         </div>
       </article>

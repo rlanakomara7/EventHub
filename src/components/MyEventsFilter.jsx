@@ -1,43 +1,41 @@
-function MyEventsFilter({ activeTab, setActiveTab }) {
+function MyProfileFilter({ activeTab, setActiveTab }) {
+  const tabs = [
+    {
+      key: "events",
+      label: "Events",
+    },
+    {
+      key: "communities",
+      label: "Communities",
+    },
+    {
+      key: "saved",
+      label: "Saved",
+    },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto px-6 mt-5 flex gap-7">
-      <button
-        type="button"
-        onClick={() => setActiveTab("upcoming")}
-        className={
-          activeTab === "upcoming"
-            ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
-        }
-      >
-        Upcoming
-      </button>
+    <div className="mt-8 grid grid-cols-3 text-center">
+      {tabs.map((tab) => {
+        const isActive = activeTab === tab.key;
 
-      <button
-        type="button"
-        onClick={() => setActiveTab("past")}
-        className={
-          activeTab === "past"
-            ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
-        }
-      >
-        Past
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setActiveTab("saved")}
-        className={
-          activeTab === "saved"
-            ? "border-b-2 border-orange-primary px-2 pb-3 text-sm text-orange-primary"
-            : "px-2 pb-3 text-sm text-gray-secondary"
-        }
-      >
-        Saved
-      </button>
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`border-b-2 px-2 pb-3 text-sm ${
+              isActive
+                ? "border-orange-primary text-orange-primary"
+                : "border-transparent text-gray-secondary"
+            }`}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-export default MyEventsFilter;
+export default MyProfileFilter;
