@@ -83,7 +83,7 @@ function AuthSignUpForm() {
 
   return (
     <div className="w-full max-w-md px-6">
-      <h1 className="text-3xl font-bold text-black-primary">
+      <h1 className="text-3xl font-bold text-black-primary  dark:text-white">
         Create Your Account
       </h1>
 

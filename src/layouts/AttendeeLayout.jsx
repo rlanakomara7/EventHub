@@ -5,7 +5,7 @@ function AttendeeLayout() {
   const handleJoin = () => {};
   const handleEventClick = () => {};
   return (
-    <div>
+    <div className="min-h-screen bg-white text-black-primary transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-100">
       <Header />
       <main>
         <Outlet context={{ handleJoin, handleEventClick }} />

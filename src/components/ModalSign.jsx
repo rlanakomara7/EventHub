@@ -2,8 +2,8 @@ import { Link } from "react-router";
 
 function ModalSign({ onClose }) {
   return (
-    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4 ">
+      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-white">
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-5 ">
           <h2 className="font-semibold">Sign in to continue</h2>
           <button

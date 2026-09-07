@@ -79,8 +79,10 @@ function AuthSignInForm() {
     navigate("/explore");
   }
   return (
-    <div className="w-full max-w-md px-6">
-      <h1 className="text-3xl font-bold text-black-primary">Welcome back</h1>
+    <div className="w-full max-w-md px-6 dark:bg-">
+      <h1 className="text-3xl font-bold text-black-primary dark:text-white">
+        Welcome back
+      </h1>
 
       <p className="mt-1 text-sm text-gray-secondary">
         Don't have an account?{" "}

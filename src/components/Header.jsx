@@ -5,6 +5,7 @@ import MobileMenu from "./MobileMenu";
 import { RxDashboard } from "react-icons/rx";
 import { FiShield } from "react-icons/fi";
 import ModalLogout from "./ModalLogout";
+import ThemeToggle from "./ThemeToggle";
 
 //redux
 import { useAppSelector, useAppDispatch } from "../hooks/reduxHooks";
@@ -35,7 +36,7 @@ function Header() {
 
   return (
     <>
-      <header className=" relative sticky top-0 z-50 flex items-center justify-between border-b border-b-gray-secondary/20 bg-white px-3 py-2 shadow-md md:px-6 md:py-3">
+      <header className=" sticky top-0 z-50 flex items-center justify-between border-b border-b-gray-secondary/20 bg-white px-3 py-2 shadow-md md:px-6 md:py-3 transition-colors duration-300 dark:border-zinc-700 dark:bg-zinc-900">
         <div className="flex flex-row items-center gap-5">
           {/* Logo */}
           <Link
@@ -47,7 +48,9 @@ function Header() {
               E
             </p>
 
-            <p className="font-bold">EventHub</p>
+            <p className="font-bold text-black-primary dark:text-white">
+              EventHub
+            </p>
           </Link>
 
           {/* DESKTOP NAVIGATION */}
@@ -58,7 +61,7 @@ function Header() {
                 className={({ isActive }) =>
                   isActive
                     ? "rounded-xl bg-orange-secondary px-3.5 py-2 text-orange-primary"
-                    : "px-3.5 py-2 text-gray-secondary"
+                    : "px-3.5 py-2 text-gray-secondary hover:text-black-primary dark:hover:text-white"
                 }
               >
                 Explore
@@ -80,7 +83,7 @@ function Header() {
                 className={({ isActive }) =>
                   isActive
                     ? "rounded-xl bg-orange-secondary px-3.5 py-2 text-orange-primary"
-                    : "px-3.5 py-2 text-gray-secondary"
+                    : "px-3.5 py-2 text-gray-secondary hover:text-black-primary dark:hover:text-white"
                 }
               >
                 Communities
@@ -93,7 +96,7 @@ function Header() {
                   className={({ isActive }) =>
                     isActive
                       ? "rounded-xl bg-orange-secondary px-3.5 py-2 text-orange-primary"
-                      : "px-3.5 py-2 text-gray-secondary"
+                      : "px-3.5 py-2 text-gray-secondary hover:text-black-primary dark:hover:text-white"
                   }
                 >
                   My Events
@@ -111,7 +114,7 @@ function Header() {
             {currentUser?.role === "organizer" && (
               <Link
                 to="/dashboard"
-                className="flex flex-row items-center gap-1 bg-orange-secondary px-3.5 py-2 text-orange-primary  rounded-lg "
+                className="flex flex-row items-center gap-1 bg-orange-secondary px-3.5 py-2 text-orange-primary rounded-lg "
               >
                 <RxDashboard />
                 Dashboard
@@ -134,9 +137,7 @@ function Header() {
                 {/* GUEST */}
                 <p className="text-xs text-gray-secondary">Browsing as guest</p>
 
-                <button type="button">
-                  <img src="/moon-svgrepo-com.svg" alt="Moon" className="w-5" />
-                </button>
+                <ThemeToggle />
 
                 <Link
                   to="/signin"
@@ -152,7 +153,7 @@ function Header() {
                   to="/notification"
                   aria-label="Open notifications"
                   className={({ isActive }) =>
-                    `relative ${isActive ? "text-orange-primary bg-orange-primary/20 p-2 rounded-lg" : "text-gray-secondary"}`
+                    `relative p-2 rounded-lg ${isActive ? "text-orange-primary bg-orange-primary/20 " : "text-gray-secondary hover:bg-gray-100 dark:hover:bg-zinc-800"}`
                   }
                 >
                   {({ isActive }) => (
@@ -161,9 +162,8 @@ function Header() {
                     />
                   )}
                 </NavLink>
-                <button type="button">
-                  <img src="/moon-svgrepo-com.svg" alt="Moon" className="w-5" />
-                </button>
+
+                <ThemeToggle />
 
                 <div className="relative">
                   <button
@@ -179,10 +179,10 @@ function Header() {
                   </button>
 
                   {profileOpen && (
-                    <div className=" absolute right-0 mt-3 w-64 rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden ">
-                      <div className="px-5 py-4 border-b border-gray-200">
+                    <div className=" absolute right-0 mt-3 w-64 rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden dark:border-zinc-700 dark:bg-zinc-900">
+                      <div className="px-5 py-4 border-b border-gray-200 dark:border-zinc-700">
                         {/* Nama user */}
-                        <p className="font-semibold text-gray-800">
+                        <p className="font-semibold text-gray-800 dark:text-white">
                           {currentUser.name || "User"}
                         </p>
 
@@ -194,9 +194,9 @@ function Header() {
 
                       <Link
                         to="/profile"
-                        // setelah klik profile dropdown ditutup
+                        // klik profile dropdown ditutup
                         onClick={() => setProfileOpen(false)}
-                        className=" block px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 "
+                        className="block px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
                       >
                         My Profile
                       </Link>
@@ -204,7 +204,7 @@ function Header() {
                       <button
                         type="button"
                         onClick={() => setLogoutModal(true)}
-                        className=" w-full text-left px-5 py-3 text-sm text-red-500 hover:bg-red-50 "
+                        className=" w-full text-left px-5 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 "
                       >
                         Logout
                       </button>
@@ -220,25 +220,23 @@ function Header() {
           <div className="flex items-center gap-3 md:hidden">
             {/* Bell hanya Attendee */}
             {currentUser && (
-              <button type="button">
+              <NavLink
+                to="/notification"
+                aria-label="Open notifications"
+                className="text-gray-primary dark:text-zinc-300"
+              >
                 <FiBell className="h-5 w-5" />
-              </button>
+              </NavLink>
             )}
 
             {/* Dark mode */}
-            <button type="button">
-              <img
-                src="/moon-svgrepo-com.svg"
-                alt="Moon"
-                className="w-5 text-gray-300"
-              />
-            </button>
+            <ThemeToggle />
 
             {/* Hamburger */}
             <button
               type="button"
               onClick={() => setIsOpen((prev) => !prev)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-secondary"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-secondary hover:cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800"
               aria-label="Toggle menu"
             >
               {isOpen ? (

@@ -32,7 +32,7 @@ function AuthForgotForm() {
   return (
     <div className="flex flex-col gap-8 w-full max-w-md px-6 leading-6">
       <div>
-        <h1 className="text-3xl font-bold text-black-primary">
+        <h1 className="text-3xl font-bold text-black-primary dark:text-white">
           Reset your password
         </h1>
         <p className="text-gray-secondary text-sm">

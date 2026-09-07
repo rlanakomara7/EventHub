@@ -3,12 +3,12 @@ import { Outlet } from "react-router";
 
 function AuthLayout() {
   return (
-    <main className="grid min-h-screen md:flex md:grid-cols-2">
+    <main className="grid min-h-screen bg-white text-black-primary transition-colors duration-300  grid min-h-screen md:flex md:grid-cols-2">
       <div className="hidden md:block grid-rows-2 w-[40%]">
         <AuthSidebar />
       </div>
 
-      <section className="flex items-center justify-center w-[60%] bg-white">
+      <section className="flex items-center justify-center w-[60%] bg-white dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
         <Outlet />
       </section>
     </main>

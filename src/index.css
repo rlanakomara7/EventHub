@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
-body {
-  margin: 0;
-  font-family: "Plus Jakarta Sans", sans-serif;
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
 }
 
 @theme {
@@ -15,4 +16,35 @@ body {
   --color-gray-secondary: #9f9fa9;
   --color-green-primary: #33b570;
   --color-green-secondary: #33b570;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background-color: #ffffff;
+  color: #111111;
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
+}
+
+html.dark body {
+  background-color: #09090b;
+  color: #f4f4f5;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
 }

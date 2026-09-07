@@ -62,7 +62,7 @@ function Hero({ search, setSearch, selectedCategory, setSelectedCategory }) {
 
             <button
               type="submit"
-              className="m-1 rounded-lg bg-orange-primary px-3 text-xs text-white-secondary md:px-6 md:text-sm"
+              className="m-1 rounded-lg bg-orange-primary px-3 text-xs text-white-secondary md:px-6 md:text-sm hover:cursor-pointers"
             >
               Search
             </button>
@@ -81,7 +81,7 @@ function Hero({ search, setSearch, selectedCategory, setSelectedCategory }) {
                 )
               }
               // style active
-              className={`rounded-full border px-5 py-1.5 text-xs font-medium ${
+              className={`rounded-full border px-5 py-1.5 text-xs font-medium hover:cursor-pointer ${
                 selectedCategory === category
                   ? "border-orange-primary bg-orange-primary text-white"
                   : "border-white/30 bg-transparent text-gray-secondary"

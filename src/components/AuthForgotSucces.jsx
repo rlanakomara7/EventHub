@@ -8,13 +8,15 @@ function AuthForgotSuccess() {
         <FiCheck className="text-xl text-green-500" />
       </div>
 
-      <h1 className="mt-5 text-2xl font-bold text-black-primary">
+      <h1 className="mt-5 text-2xl font-bold text-black-primary  dark:text-white">
         Your password has been updated successfully...
       </h1>
 
       <p className="mt-2 text-sm text-gray-secondary">
         Check your email . We sent a reset link to{" "}
-        <span className="font-semibold text-black-primary">your@mail.com</span>
+        <span className="font-semibold text-black-primary dark:text-white">
+          your@mail.com
+        </span>
       </p>
 
       <Link to="/signin" className="mt-6 text-sm text-orange-primary">

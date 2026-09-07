@@ -213,11 +213,11 @@ function MyProfile() {
 
   return (
     <>
-      <div className="mt-10">
+      <div className="mt-10 dark:text-white">
         <div className="mx-auto flex max-w-4xl items-start justify-between">
           <div className="flex gap-5">
             <div className="relative">
-              {/* REVISI: menampilkan foto user */}
+              {/*foto user */}
               <img
                 src={user?.avatar || "/SON_9681.JPG"}
                 alt={user?.name || "Profile"}
@@ -251,7 +251,7 @@ function MyProfile() {
           <button
             type="button"
             onClick={handleOpenEditProfile}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700"
+            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
           >
             ✎ Edit Profile
           </button>
@@ -343,12 +343,12 @@ function MyProfile() {
         </section>
       </div>
 
-      {/* REVISI: modal Edit Profile */}
+      {/* modal Edit Profile */}
       {showEditProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 ">
           <form
             onSubmit={handleSaveProfile}
-            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"
+            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
           >
             <div className="flex items-center justify-between border-b pb-4">
               <h2 className="text-lg font-semibold">Edit Profile</h2>
@@ -405,7 +405,7 @@ function MyProfile() {
                   type="email"
                   value={profileForm.email}
                   readOnly
-                  className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
                 />
               </div>
 
@@ -447,7 +447,7 @@ function MyProfile() {
               <button
                 type="button"
                 onClick={() => setShowEditProfile(false)}
-                className="rounded-lg bg-gray-100 px-4 py-2 text-sm"
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm dark:border-white dark:bg-zinc-900 dark:text-white"
               >
                 Cancel
               </button>

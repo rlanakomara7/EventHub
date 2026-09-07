@@ -60,7 +60,7 @@ function EventCard({
 
   return (
     <>
-      <article className="flex flex-col h-full overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
+      <article className="flex flex-col h-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
         <div onClick={() => onEventClick(event.id)} className="cursor-pointer">
           <img
             src={event.image}
@@ -113,7 +113,7 @@ function EventCard({
         <div className="flex flex-row items-center gap-2 text-gray-secondary px-4 py-4 ">
           <button
             type="button"
-            className={`flex-1 rounded-xl p-1 text-center text-white-secondary ${
+            className={`flex-1 rounded-xl p-1 text-center text-white-secondary hover:cursor-pointer ${
               registered ? "bg-green-primary" : "bg-orange-primary"
             }`}
             onClick={(e) => {
@@ -140,7 +140,7 @@ function EventCard({
             aria-label={saved ? "Unsave event" : "Save event"}
           >
             <FaBookmark
-              className={`text-2xl ${saved ? "text-orange-primary" : "text-gray-400"}`}
+              className={`text-2xl hover:cursor-pointer ${saved ? "text-orange-primary" : "text-gray-400"}`}
             />
           </button>
         </div>

@@ -104,7 +104,7 @@ function CommunityCard({
   }
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white-secondary shadow-sm">
+    <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
       <div
         className="h-44 w-full cursor-pointer overflow-hidden"
         onClick={() => navigate(`/communities/${community.id}`)}
@@ -118,7 +118,7 @@ function CommunityCard({
 
       <div className="flex flex-1 flex-col space-y-3 px-4 py-4">
         <h3
-          className="cursor-pointer text-lg font-semibold text-gray-900"
+          className="cursor-pointer text-lg font-semibold text-gray-900  dark:text-white"
           onClick={() => navigate(`/communities/${community.id}`)}
         >
           {community.name}
@@ -150,7 +150,7 @@ function CommunityCard({
           <button
             type="button"
             onClick={handleJoin}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium text-white-secondary ${
+            className={`flex-1 rounded-lg py-2 text-sm font-medium text-white-secondary hover:cursor-pointer ${
               joined ? "bg-green-primary" : "bg-orange-primary"
             }`}
           >

@@ -15,10 +15,10 @@ function readStorage(key) {
 function MyEvents() {
   const navigate = useNavigate();
 
-  // REVISI 1: tab awal adalah Upcoming
+  // tab awal adalah Upcoming
   const [activeTab, setActiveTab] = useState("upcoming");
 
-  // REVISI 2: data Join dan Save dipisahkan
+  // data Join dan Save dipisahkan
   const [registeredEvents, setRegisteredEvents] = useState(() =>
     readStorage("registeredEvents"),
   );
@@ -31,7 +31,7 @@ function MyEvents() {
     navigate(`/event/${eventId}`);
   }
 
-  // REVISI 3: fungsi Join dan Unregister
+  //  fungsi Join dan Unregister
   function handleToggleRegistered(event) {
     const alreadyRegistered = registeredEvents.some(
       (item) => String(item.id) === String(event.id),
@@ -46,7 +46,7 @@ function MyEvents() {
     setRegisteredEvents(updatedEvents);
   }
 
-  // REVISI 4: fungsi menghapus atau menambah Saved
+  // fungsi menghapus atau menambah Saved
   function handleSavedChange(event, isSaved) {
     const updatedEvents = isSaved
       ? savedEvents.some((item) => String(item.id) === String(event.id))
@@ -62,7 +62,7 @@ function MyEvents() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // REVISI 5: event terdaftar yang akan datang
+  //  event terdaftar yang akan datang
   const upcomingEvents = registeredEvents.filter((event) => {
     const eventDate = new Date(event.date);
     eventDate.setHours(0, 0, 0, 0);
@@ -70,7 +70,7 @@ function MyEvents() {
     return eventDate >= today;
   });
 
-  // REVISI 6: event terdaftar yang sudah lewat
+  // event terdaftar yang sudah lewat
   const pastEvents = registeredEvents.filter((event) => {
     const eventDate = new Date(event.date);
     eventDate.setHours(0, 0, 0, 0);
@@ -78,7 +78,7 @@ function MyEvents() {
     return eventDate < today;
   });
 
-  // REVISI 7: menentukan card sesuai tab aktif
+  // menentukan card sesuai tab aktif
   const visibleEvents =
     activeTab === "upcoming"
       ? upcomingEvents
@@ -88,10 +88,12 @@ function MyEvents() {
 
   return (
     <>
-      <div className="mx-auto max-w-6xl px-6 py-5">
-        <h1 className="text-3xl font-bold text-black-primary">My Events</h1>
+      <div className="mx-auto max-w-6xl px-6 mt-7">
+        <h1 className="text-3xl font-bold text-black-primary dark:text-white">
+          My Events
+        </h1>
 
-        {/* REVISI 8: kirim jumlah ke tab */}
+        {/*kirim jumlah ke tab */}
         <MyEventsFilter
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -103,7 +105,7 @@ function MyEvents() {
         />
       </div>
 
-      <section className="min-h-screen bg-white-secondary py-6">
+      <section className="min-h-screen bg-white-secondary py-6 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
             {visibleEvents.length > 0 ? (
@@ -115,9 +117,9 @@ function MyEvents() {
                     (item) => String(item.id) === String(event.id),
                   )}
                   onEventClick={handleEventClick}
-                  // REVISI 9: Join atau Registered
+                  // Join atau Registered
                   onAuthRequired={() => handleToggleRegistered(event)}
-                  // REVISI 10: Save atau Unsave
+                  // Save atau Unsave
                   onSavedChange={handleSavedChange}
                 />
               ))
