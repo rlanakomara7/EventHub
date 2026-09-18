@@ -118,7 +118,7 @@ function CommunityCard({
 
       <div className="flex flex-1 flex-col space-y-3 px-4 py-4">
         <h3
-          className="cursor-pointer text-lg font-semibold text-gray-900  dark:text-white"
+          className="cursor-pointer text-lg font-semibold text-gray-900 dark:text-white"
           onClick={() => navigate(`/communities/${community.id}`)}
         >
           {community.name}

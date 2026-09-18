@@ -1,15 +1,7 @@
 import { createSlice } from "@reduxjs/toolkit";
 
-function getCurrentUser() {
-  try {
-    return JSON.parse(localStorage.getItem("currentUser")) || null;
-  } catch {
-    return null;
-  }
-}
-
 const initialState = {
-  user: getCurrentUser(),
+  user: null,
 };
 
 const authSlice = createSlice({
@@ -20,8 +12,6 @@ const authSlice = createSlice({
   reducers: {
     login: (state, action) => {
       state.user = action.payload;
-
-      localStorage.setItem("currentUser", JSON.stringify(action.payload));
     },
 
     updateProfile: (state, action) => {
@@ -36,8 +26,6 @@ const authSlice = createSlice({
 
       state.user = updatedUser;
 
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-
       const users = JSON.parse(localStorage.getItem("users")) || [];
 
       const userIndex = users.findIndex(
@@ -50,14 +38,12 @@ const authSlice = createSlice({
           ...users[userIndex],
           ...action.payload,
         };
-
         localStorage.setItem("users", JSON.stringify(users));
       }
     },
 
     logout: (state) => {
       state.user = null;
-      localStorage.removeItem("currentUser");
     },
   },
 });
