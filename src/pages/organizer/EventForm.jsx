@@ -3,8 +3,8 @@ import { useNavigate, useParams } from "react-router";
 import { useSelector } from "react-redux";
 
 import { createEvent } from "../../services/eventsService";
+import { getEventDetail, updateEvent } from "../../services/eventEditService";
 import { getCommunities } from "../../services/communityService";
-import { getEvents, saveEvents, deleteEvent } from "../../utils/eventStorage";
 
 const emptyForm = {
   title: "",
@@ -21,83 +21,51 @@ const emptyForm = {
   speakers: [],
 };
 
-function formatDateForInput(value) {
-  if (!value) return "";
+function getImageUrl(path) {
+  if (!path) return "";
 
-  if (/^\d{4}-\d{2}-\d{2}/.test(String(value))) {
-    return String(value).slice(0, 10);
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://") ||
+    path.startsWith("data:")
+  ) {
+    return path;
   }
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
+  const baseUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:8500"
+  ).replace(/\/$/, "");
 
-  return date.toISOString().split("T")[0];
-}
-
-function formatTimeForInput(value) {
-  if (!value) return "";
-  return String(value).replace(" WIB", "").slice(0, 5);
+  return path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
 }
 
 function EventForm({ mode = "create" }) {
   const navigate = useNavigate();
   const { id } = useParams();
-  const currentUser = useSelector((state) => state.auth.user);
 
+  const currentUser = useSelector((state) => state.auth.user);
   const isEdit = mode === "edit";
 
-  const [selectedEvent] = useState(() => {
-    if (!isEdit) return null;
-
-    return getEvents().find((item) => String(item.id) === String(id)) || null;
-  });
-
   const [step, setStep] = useState(1);
-
-  const [form, setForm] = useState(() => {
-    if (!selectedEvent) {
-      return { ...emptyForm };
-    }
-
-    return {
-      title: selectedEvent.title || "",
-      description: selectedEvent.description || "",
-      category: selectedEvent.category || "",
-      community: selectedEvent.community || "",
-      image: selectedEvent.image || "",
-      date: formatDateForInput(selectedEvent.date),
-      time: formatTimeForInput(selectedEvent.time),
-      endTime: formatTimeForInput(selectedEvent.endTime),
-      eventFormat: selectedEvent.eventFormat || "in-person",
-      location: selectedEvent.location || "",
-      capacity: selectedEvent.capacity || 100,
-      speakers: Array.isArray(selectedEvent.speakers)
-        ? selectedEvent.speakers
-        : [],
-    };
-  });
+  const [form, setForm] = useState({ ...emptyForm });
 
   const [speakerInput, setSpeakerInput] = useState("");
   const [bannerFile, setBannerFile] = useState(null);
   const [availableCommunities, setAvailableCommunities] = useState([]);
+
+  const [loadingEvent, setLoadingEvent] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
 
-  const [error, setError] = useState(
-    isEdit && !selectedEvent ? "Event not found." : "",
-  );
-
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  // ✅ TAMBAH: Mengambil komunitas dari backend
   useEffect(() => {
-    if (isEdit) return;
-
     const controller = new AbortController();
 
     getCommunities("", "", controller.signal)
-      .then((data) => {
+      .then((communities) => {
         if (!controller.signal.aborted) {
-          setAvailableCommunities(data);
+          setAvailableCommunities(communities);
         }
       })
       .catch((err) => {
@@ -107,40 +75,61 @@ function EventForm({ mode = "create" }) {
       });
 
     return () => controller.abort();
-  }, [isEdit]);
+  }, []);
 
-  if (currentUser?.role !== "organizer") {
-    return (
-      <main className="p-10 text-center">
-        <h1 className="text-2xl font-bold">Access denied</h1>
-        <p className="mt-2 text-gray-secondary">
-          Only organizers can manage events.
-        </p>
-      </main>
-    );
-  }
+  useEffect(() => {
+    if (!isEdit) return;
 
-  if (success) {
-    return (
-      <main className="min-h-screen bg-white">
-        <div className="flex min-h-[75vh] flex-col items-center justify-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-500">
-            ✓
-          </div>
+    const controller = new AbortController();
 
-          <h1 className="mt-4 text-xl font-semibold text-gray-900">
-            {isEdit ? "Event Updated!" : "Event Created!"}
-          </h1>
+    getEventDetail(id, controller.signal)
+      .then((event) => {
+        if (controller.signal.aborted) return;
 
-          <p className="mt-1 text-sm text-gray-400">
-            {isEdit
-              ? "Redirecting to your dashboard..."
-              : "Redirecting to event list..."}
-          </p>
-        </div>
-      </main>
-    );
-  }
+        const category = event.categories[0];
+
+        const speakers = event.speakers
+          .map((speaker) =>
+            typeof speaker === "string" ? speaker : speaker.name,
+          )
+          .filter(Boolean);
+
+        const communityID =
+          event.community?.community_id ?? event.community_id ?? "";
+
+        setForm({
+          title: event.title || "",
+          description: event.description || "",
+          category:
+            typeof category === "string"
+              ? category
+              : category?.category_name || "",
+          community: Number(communityID) > 0 ? String(communityID) : "",
+          image: getImageUrl(event.banner_url),
+          date: String(event.event_date || "").slice(0, 10),
+          time: String(event.start_time || "").slice(0, 5),
+          endTime: String(event.end_time || "").slice(0, 5),
+          eventFormat: event.format === "online" ? "online" : "in-person",
+          location: event.location || "",
+          capacity: event.capacity ?? 100,
+          speakers,
+        });
+
+        setError("");
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(err.message || "Failed to load event.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingEvent(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [isEdit, id]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -189,8 +178,6 @@ function EventForm({ mode = "create" }) {
     });
   }
 
-  // 🔄 UBAH: Preview menggunakan base64,
-  // tetapi upload ke backend menggunakan File asli
   async function processImageFile(file) {
     if (!file) return;
 
@@ -209,16 +196,16 @@ function EventForm({ mode = "create" }) {
     setError("");
 
     try {
-      const resizedDataUrl = await resizeImageFile(file);
+      const preview = await resizeImageFile(file);
 
       setForm((previous) => ({
         ...previous,
-        image: resizedDataUrl,
+        image: preview,
       }));
 
       setBannerFile(file);
     } catch {
-      setError("Failed to process the image. Please try a different file.");
+      setError("Failed to process the image.");
     }
   }
 
@@ -284,6 +271,7 @@ function EventForm({ mode = "create" }) {
 
   function handleContinue() {
     if (!validateStep()) return;
+
     setStep((previous) => previous + 1);
   }
 
@@ -299,109 +287,92 @@ function EventForm({ mode = "create" }) {
     }
   }
 
-  // Edit/Delete masih localStorage sampai endpoint tersedia
-  function handleDelete() {
-    const events = getEvents();
-    const ownerId = currentUser.id || currentUser.email;
-
-    const selectedEvent = events.find((item) => String(item.id) === String(id));
-
-    if (!selectedEvent) {
-      setError("Event not found.");
-      return;
-    }
-
-    if (
-      selectedEvent.organizerId &&
-      String(selectedEvent.organizerId) !== String(ownerId)
-    ) {
-      setError("You do not have permission to delete this event.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete "${selectedEvent.title}"? This cannot be undone.`,
-    );
-
-    if (!confirmed) return;
-
-    deleteEvent(id);
-    navigate("/dashboard");
-  }
-
-  // 🔄 UBAH: Create Event disimpan melalui backend API
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (step !== 3 || submitting) return;
 
     setError("");
-
-    if (!isEdit) {
-      setSubmitting(true);
-
-      try {
-        await createEvent(form, bannerFile);
-
-        setSuccess(true);
-
-        window.setTimeout(() => {
-          navigate("/event");
-        }, 1800);
-      } catch (err) {
-        setError(err.message || "Failed to publish event.");
-      } finally {
-        setSubmitting(false);
-      }
-
-      return;
-    }
-
-    // Edit sementara tetap memakai localStorage
-    const events = getEvents();
-    const ownerId = currentUser.id || currentUser.email;
-
-    const eventToEdit = events.find((item) => String(item.id) === String(id));
-
-    if (!eventToEdit) {
-      setError("Event not found.");
-      return;
-    }
-
-    if (
-      eventToEdit.organizerId &&
-      String(eventToEdit.organizerId) !== String(ownerId)
-    ) {
-      setError("You do not have permission to edit this event.");
-      return;
-    }
-
-    const updatedEvents = events.map((item) =>
-      String(item.id) === String(id)
-        ? {
-            ...item,
-            ...form,
-            capacity: Number(form.capacity),
-            time: `${form.time} WIB`,
-            endTime: `${form.endTime} WIB`,
-            organizerId: item.organizerId || ownerId,
-            organizerName: item.organizerName || currentUser.name,
-          }
-        : item,
-    );
+    setSubmitting(true);
 
     try {
-      saveEvents(updatedEvents);
-    } catch {
-      setError("Failed to save event changes.");
-      return;
+      if (isEdit) {
+        await updateEvent(id, form, bannerFile);
+      } else {
+        await createEvent(form, bannerFile);
+      }
+
+      setSuccess(true);
+
+      window.setTimeout(() => {
+        navigate(isEdit ? "/dashboard" : "/event");
+      }, 1800);
+    } catch (err) {
+      setError(err.message || "Failed to save event.");
+    } finally {
+      setSubmitting(false);
     }
+  }
 
-    setSuccess(true);
+  if (currentUser?.role !== "organizer") {
+    return (
+      <main className="p-10 text-center">
+        <h1 className="text-2xl font-bold">Access denied</h1>
 
-    window.setTimeout(() => {
-      navigate("/dashboard");
-    }, 1800);
+        <p className="mt-2 text-gray-secondary">
+          Only organizers can manage events.
+        </p>
+      </main>
+    );
+  }
+
+  if (loadingEvent) {
+    return (
+      <main className="p-10 text-center">
+        <p className="text-gray-secondary">Loading event data...</p>
+      </main>
+    );
+  }
+
+  if (success) {
+    return (
+      <main className="min-h-screen bg-white">
+        <div className="flex min-h-[75vh] flex-col items-center justify-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-500">
+            ✓
+          </div>
+
+          <h1 className="mt-4 text-xl font-semibold text-gray-900">
+            {isEdit ? "Event Updated!" : "Event Created!"}
+          </h1>
+
+          <p className="mt-1 text-sm text-gray-400">
+            {isEdit
+              ? "Redirecting to your dashboard..."
+              : "Redirecting to event list..."}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // ✅ TAMBAH: Jangan tampilkan form kosong jika gagal load Edit
+  if (isEdit && error && !form.title) {
+    return (
+      <main className="mx-auto max-w-2xl p-10">
+        <p role="alert" className="text-red-600">
+          {error}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          className="mt-4 text-orange-primary"
+        >
+          ← Back to Dashboard
+        </button>
+      </main>
+    );
   }
 
   return (
@@ -444,7 +415,10 @@ function EventForm({ mode = "create" }) {
 
       <div className="mx-auto max-w-2xl px-6 py-8">
         {error && (
-          <div className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+          <div
+            role="alert"
+            className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600"
+          >
             {error}
           </div>
         )}
@@ -503,6 +477,12 @@ function EventForm({ mode = "create" }) {
                   onChange={handleImageChange}
                   className="hidden"
                 />
+
+                {isEdit && (
+                  <p className="mt-2 text-xs text-gray-400">
+                    Leave unchanged to keep the current banner.
+                  </p>
+                )}
               </div>
 
               <div className="mt-5">
@@ -561,7 +541,6 @@ function EventForm({ mode = "create" }) {
                   <span className="font-normal text-gray-400">(optional)</span>
                 </label>
 
-                {/* 🔄 UBAH: Komunitas dari PostgreSQL */}
                 <select
                   name="community"
                   value={form.community}
@@ -570,9 +549,16 @@ function EventForm({ mode = "create" }) {
                 >
                   <option value="">No community</option>
 
-                  {isEdit && form.community && (
-                    <option value={form.community}>{form.community}</option>
-                  )}
+                  {form.community &&
+                    !availableCommunities.some(
+                      (community) =>
+                        String(community.community_id) ===
+                        String(form.community),
+                    ) && (
+                      <option value={form.community}>
+                        Current community (ID {form.community})
+                      </option>
+                    )}
 
                   {availableCommunities.map((community) => (
                     <option
@@ -769,93 +755,49 @@ function EventForm({ mode = "create" }) {
               </div>
 
               <div className="mt-6 overflow-hidden rounded-lg border border-gray-200">
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Title</span>
-                  <span className="text-right text-gray-900">
-                    {form.title || "-"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Category</span>
-                  <span className="text-right text-gray-900">
-                    {form.category || "-"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Date</span>
-                  <span className="text-right text-gray-900">
-                    {form.date || "-"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Time</span>
-                  <span className="text-right text-gray-900">
-                    {form.time && form.endTime
+                {[
+                  ["Title", form.title || "-"],
+                  ["Category", form.category || "-"],
+                  ["Date", form.date || "-"],
+                  [
+                    "Time",
+                    form.time && form.endTime
                       ? `${form.time} – ${form.endTime} WIB`
-                      : "-"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Format</span>
-                  <span className="text-right text-gray-900">
-                    {form.eventFormat === "online" ? "Online" : "In Person"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Location</span>
-                  <span className="text-right text-gray-900">
-                    {form.location || "-"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Capacity</span>
-                  <span className="text-right text-gray-900">
-                    {form.capacity} attendees
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 px-4 py-3 text-sm">
-                  <span className="text-gray-500">Speakers</span>
-                  <span className="text-right text-gray-900">
-                    {form.speakers.length} added
-                  </span>
-                </div>
+                      : "-",
+                  ],
+                  [
+                    "Format",
+                    form.eventFormat === "online" ? "Online" : "In Person",
+                  ],
+                  ["Location", form.location || "-"],
+                  ["Capacity", `${form.capacity} attendees`],
+                  ["Speakers", `${form.speakers.length} added`],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm last:border-b-0"
+                  >
+                    <span className="text-gray-500">{label}</span>
+                    <span className="text-right text-gray-900">{value}</span>
+                  </div>
+                ))}
               </div>
             </>
           )}
 
           <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  step === 1 ? navigate("/dashboard") : setStep(step - 1)
-                }
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:border-orange-primary"
-              >
-                {step === 1 ? "Cancel" : "← Back"}
-              </button>
-
-              {isEdit && (
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  Delete Event
-                </button>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() =>
+                step === 1 ? navigate("/dashboard") : setStep(step - 1)
+              }
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:border-orange-primary"
+            >
+              {step === 1 ? "Cancel" : "← Back"}
+            </button>
 
             {step < 3 ? (
               <button
-                key="continue-button"
                 type="button"
                 onClick={handleContinue}
                 className="rounded-lg bg-orange-primary px-5 py-2.5 text-sm text-white"
@@ -864,13 +806,12 @@ function EventForm({ mode = "create" }) {
               </button>
             ) : (
               <button
-                key="submit-button"
                 type="submit"
                 disabled={submitting}
                 className="rounded-lg bg-green-500 px-5 py-2.5 text-sm text-white hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting
-                  ? "Publishing..."
+                  ? "Saving..."
                   : isEdit
                     ? "✓ Save Changes"
                     : "✓ Publish Event"}

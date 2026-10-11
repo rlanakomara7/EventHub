@@ -1,15 +1,6 @@
 import { CiSearch } from "react-icons/ci";
 
 function CommunityHero({ search, setSearch }) {
-  function CreateParam(key, url) {
-    const find = new URLSearchParams(searchParam);
-    if (find.has(key)) {
-      find.set(key, url);
-    } else {
-      find.append(key, url);
-    }
-    useSearchParam(find);
-  }
   return (
     <section
       className="bg-black-primary 

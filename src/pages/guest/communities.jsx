@@ -1,48 +1,87 @@
+import { useEffect, useState } from "react";
 import CommunityHero from "../../components/CommunityHero";
 import CommunityFilter from "../../components/CommunityFilter";
 import CommunityList from "../../components/CommunityList";
-import communities from "../../data/communities.json";
 import ModalSign from "../../components/ModalSign";
-import { useState } from "react";
+import { getCommunities } from "../../services/communityService";
+import { joinCommunity, leaveCommunity } from "../../services/communityService";
 
 function Communities() {
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
-
-  // state untuk category
   const [selectedCategory, setSelectedCategory] = useState("All");
-
-  // state untuk location
   const [selectedLocation, setSelectedLocation] = useState("All Locations");
 
-  // Filter community
-  const communitiesFiltered = communities.filter((community) => {
-    const keyword = search.toLowerCase();
+  const [communities, setCommunities] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-    // FILTER SEARCH
-    const matchSearch =
-      community.name.toLowerCase().includes(keyword) ||
-      community.description.toLowerCase().includes(keyword) ||
-      community.category.toLowerCase().includes(keyword);
+  useEffect(() => {
+    const controller = new AbortController();
 
-    // FILTER CATEGORY
-    const matchCategory =
-      selectedCategory === "All" || community.category === selectedCategory;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setError("");
 
-    const matchLocation =
-      selectedLocation === "All Locations" ||
-      community.location === selectedLocation;
+      try {
+        const data = await getCommunities(
+          search,
+          selectedCategory,
+          controller.signal,
+        );
 
-    return matchSearch && matchCategory && matchLocation;
-  });
+        if (!controller.signal.aborted) {
+          setCommunities(data);
+        }
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }, 300);
 
-  const currentUser = JSON.parse(localStorage.getItem("currentUser"));
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, selectedCategory]);
+
+  const communityCards = communities.map((community) => ({
+    id: community.community_id,
+    name: community.name,
+    description: community.description || "",
+    image: community.banner_url || "/C-Image(BandungGoCommunity).svg",
+    category: community.categories?.join(", ") || "—",
+    members: community.member_count ?? 0,
+    upcomingEvents: community.upcoming_count ?? 0,
+    isJoined: community.is_joined === true,
+  }));
 
   function handleJoin() {
-    if (!currentUser) {
+    if (!localStorage.getItem("token")) {
       setShowModal(true);
-      return;
     }
+  }
+
+  async function handleJoinChange(community) {
+    try {
+      if (community.isJoined) {
+        await leaveCommunity(community.id);
+      } else {
+        await joinCommunity(community.id);
+      }
+    } catch (error) {
+      if (!error.message?.includes("already joined community")) {
+        throw error;
+      }
+    }
+
+    const latest = await getCommunities(search, selectedCategory);
+    setCommunities(latest);
   }
 
   return (
@@ -58,16 +97,31 @@ function Communities() {
 
       <div className="px-3 md:px-6 lg:px-12">
         <p className="text-sm font-bold md:text-base">
-          {communitiesFiltered.length}{" "}
+          {communityCards.length}{" "}
           <span className="font-medium text-gray-primary/40">Communities</span>
         </p>
       </div>
 
+      {selectedLocation !== "All Locations" && (
+        <p className="px-6 text-sm text-orange-primary">
+          Filter lokasi belum tersedia.
+        </p>
+      )}
+
       <div className="px-12">
-        <CommunityList
-          communities={communitiesFiltered}
-          onAuthRequired={handleJoin}
-        />
+        {loading ? (
+          <p className="py-10 text-center">Loading communities...</p>
+        ) : error ? (
+          <p className="py-10 text-center text-red-500">{error}</p>
+        ) : communityCards.length === 0 ? (
+          <p className="py-10 text-center">No communities found.</p>
+        ) : (
+          <CommunityList
+            communities={communityCards}
+            onAuthRequired={handleJoin}
+            onJoinChange={handleJoinChange}
+          />
+        )}
       </div>
 
       {showModal && <ModalSign onClose={() => setShowModal(false)} />}

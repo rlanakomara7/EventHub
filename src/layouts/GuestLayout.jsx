@@ -27,20 +27,18 @@ function GuestLayout() {
 
     // Cek event
     const alreadyRegistered = registeredEvents.some(
-      (item) => item.id === event.id,
+      (item) => String(item.event_id) === String(event.event_id),
     );
 
     if (alreadyRegistered) {
       // UNREGISTER
-
       const updatedEvents = registeredEvents.filter(
-        (item) => item.id !== event.id,
+        (item) => String(item.event_id) !== String(event.event_id),
       );
 
       localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
     } else {
       // REGISTER
-
       const updatedEvents = [...registeredEvents, event];
 
       localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));

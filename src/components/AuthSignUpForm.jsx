@@ -4,6 +4,8 @@ import { FiEye, FiEyeOff } from "react-icons/fi";
 import { Link, useNavigate } from "react-router";
 import { useState } from "react";
 
+import { registerUser } from "../services/authService";
+
 function AuthSignUpForm() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -16,7 +18,7 @@ function AuthSignUpForm() {
 
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     const newErrors = {};
@@ -64,21 +66,14 @@ function AuthSignUpForm() {
       return;
     }
 
-    // set data untuk user baru
-    const newUser = {
-      id: Date.now(),
-      name: fullName,
-      email: email,
-      password: password,
-      role: "attendee",
-      image: "/Default-Avatar.svg",
-    };
-
-    // tambah data to local storage
-    localStorage.setItem("users", JSON.stringify([...users, newUser]));
-
-    // move to signin
-    navigate("/signin");
+    try {
+      await registerUser(fullName, email, password);
+      navigate("/signin");
+    } catch (error) {
+      setErrors({
+        register: error.message,
+      });
+    }
   }
 
   return (
@@ -206,6 +201,7 @@ function AuthSignUpForm() {
                 errors.password ? "border-red-500" : "border-gray-200"
               }`}
             />
+
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
@@ -288,6 +284,9 @@ function AuthSignUpForm() {
         >
           Create Account
         </button>
+        {errors.register && (
+          <p className="text-xs text-red-500">{errors.register}</p>
+        )}
       </form>
     </div>
   );

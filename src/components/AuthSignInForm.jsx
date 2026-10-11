@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 //redux
 import { useAppDispatch } from "../hooks/reduxHooks";
 import { login } from "../redux/slice/authSlice";
+import { loginUser } from "../services/authService";
 
 function AuthSignInForm() {
   const [email, setEmail] = useState("");
@@ -15,12 +16,11 @@ function AuthSignInForm() {
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
 
-  //redux
   const dispatch = useAppDispatch();
 
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     const newErrors = {};
@@ -39,44 +39,28 @@ function AuthSignInForm() {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users")) || [];
+    try {
+      const result = await loginUser(email, password);
 
-    let admin = import.meta.env.VITE_ADMIN;
+      const userData = {
+        name: result.user.name,
+        email: result.user.email,
+        role: result.user.role,
+        avatar: result.user.avatar_url,
+      };
 
-    let organizer = import.meta.env.VITE_ORGANIZER;
+      localStorage.setItem("token", result.token);
 
-    admin = JSON.parse(admin);
-    organizer = JSON.parse(organizer);
+      localStorage.setItem("user", JSON.stringify(userData));
 
-    users.push(admin);
+      dispatch(login(userData));
 
-    users.push(organizer);
-
-    const user = users.find(
-      (user) => user.email === email && user.password === password,
-    );
-
-    if (!user) {
+      navigate("/explore");
+    } catch (error) {
       setErrors({
-        login: "Email or password is incorrect",
+        login: error.message,
       });
-      return;
     }
-
-    //redux
-    dispatch(
-      login({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role || user.user_type || "attendee",
-        location: user.location || "Indonesia",
-        bio: user.bio || "",
-        avatar: user.avatar || "/SON_9681.JPG",
-      }),
-    );
-
-    navigate("/explore");
   }
   return (
     <div className="w-full max-w-md px-6 dark:bg-">

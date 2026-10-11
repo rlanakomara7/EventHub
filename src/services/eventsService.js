@@ -80,3 +80,46 @@ export async function createEvent(form, bannerFile) {
 
   return result;
 }
+
+//geteventsmy
+export async function getMyEvents(signal) {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error("Please login as organizer first");
+  }
+
+  const response = await fetch(`${API_URL}/api/events/my`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal,
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(result.message || "Failed to load your events");
+  }
+
+  const candidates = [
+    result,
+    result.data,
+    result.events,
+    result.my_events,
+    result.data?.events,
+    result.data?.my_events,
+    result.data?.items,
+  ];
+
+  const events = candidates.find(Array.isArray);
+
+  if (!events) {
+    throw new Error(
+      "Format response GET /api/events/my not found , check your response API",
+    );
+  }
+
+  return events;
+}

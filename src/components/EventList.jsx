@@ -6,7 +6,7 @@ function EventList({ events, onAuthRequired, onEventClick }) {
       <main className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {events.map((event) => (
           <EventCard
-            key={event.id}
+            key={event.event_id}
             event={event}
             onAuthRequired={onAuthRequired}
             onEventClick={onEventClick}

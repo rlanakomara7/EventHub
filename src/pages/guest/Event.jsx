@@ -2,7 +2,7 @@ import { useOutletContext } from "react-router";
 import { useEffect, useState } from "react";
 import SearchBar from "../../components/SearchBar";
 import EventList from "../../components/EventList";
-import { getEvents } from "../../utils/eventStorage";
+import { getEvents } from "../../services/eventsService";
 
 function Event() {
   const { handleEventClick, handleJoin } = useOutletContext();
@@ -13,10 +13,25 @@ function Event() {
   const [search, setSearch] = useState("");
 
   // Ambil data dari localStorage lewat getEvents()
-  const [events, setEvents] = useState(() => getEvents());
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, serError] = useState("");
 
+  //connect database
   useEffect(() => {
-    setEvents(getEvents());
+    async function fetchEvents() {
+      try {
+        const result = await getEvents();
+        console.log("GET EVENTS:", result);
+        setEvents(result.data || []);
+      } catch (error) {
+        console.error(error.message);
+        serError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchEvents();
   }, []);
 
   const eventsFiltered = events.filter((event) => {
@@ -24,17 +39,28 @@ function Event() {
 
     const matchSearch =
       event.title?.toLowerCase().includes(keyword) ||
-      event.category?.toLowerCase().includes(keyword) ||
-      event.location?.toLowerCase().includes(keyword);
+      event.location?.toLowerCase().includes(keyword) ||
+      event.categories?.some((category) =>
+        category.toLowerCase().includes(keyword),
+      );
 
     // CATEGORY
     const matchCategory =
-      selectedCategory === "All" || event.category === selectedCategory;
+      selectedCategory === "All" ||
+      event.categories?.includes(selectedCategory);
 
-    // harus lolos search DAN category
+    // harus lolos search & category
     return matchSearch && matchCategory;
   });
 
+  //handle loading and error
+  if (loading) {
+    return <div className="py-10 text-center">Loading Events...</div>;
+  }
+
+  if (error) {
+    return <div className="py-10 text-center">{error}</div>;
+  }
   return (
     <>
       <SearchBar

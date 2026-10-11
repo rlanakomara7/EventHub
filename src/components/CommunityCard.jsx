@@ -1,97 +1,103 @@
 import { MdPeopleAlt } from "react-icons/md";
 import { FiCalendar } from "react-icons/fi";
 import { FaBookmark } from "react-icons/fa";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 
 function CommunityCard({
   community,
-  onAuthRequired = () => {},
-  onJoinChange = () => {},
-  onSavedChange = () => {},
-  isJoined = false,
-  isSaved = false,
+  onAuthRequired,
+  onJoinChange,
+  onSavedChange,
 }) {
   const navigate = useNavigate();
 
-  const [joined, setJoined] = useState(isJoined);
-  const [saved, setSaved] = useState(isSaved);
+  const communityId = community.id ?? community.community_id;
 
-  useEffect(() => {
-    const joinedCommunities =
-      JSON.parse(localStorage.getItem("joinedCommunities")) || [];
+  const joined = community.isJoined === true || community.is_joined === true;
 
-    const savedCommunities =
-      JSON.parse(localStorage.getItem("savedCommunities")) || [];
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
 
-    setJoined(
-      joinedCommunities.some(
-        (item) => String(item.id) === String(community.id),
-      ),
-    );
+  function getSavedCommunities() {
+    try {
+      const data = JSON.parse(localStorage.getItem("savedCommunities") || "[]");
 
-    setSaved(
-      savedCommunities.some((item) => String(item.id) === String(community.id)),
-    );
-  }, [community.id, isJoined, isSaved]);
-
-  function handleJoin() {
-    const currentUser = localStorage.getItem("currentUser");
-
-    if (!currentUser) {
-      onAuthRequired(community);
-      return;
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
     }
-
-    const joinedCommunities =
-      JSON.parse(localStorage.getItem("joinedCommunities")) || [];
-
-    const alreadyJoined = joinedCommunities.some(
-      (item) => String(item.id) === String(community.id),
-    );
-
-    const updatedCommunities = alreadyJoined
-      ? joinedCommunities.filter(
-          (item) => String(item.id) !== String(community.id),
-        )
-      : [...joinedCommunities, community];
-
-    const nextJoined = !alreadyJoined;
-
-    localStorage.setItem(
-      "joinedCommunities",
-      JSON.stringify(updatedCommunities),
-    );
-
-    setJoined(nextJoined);
-
-    onJoinChange(community, nextJoined);
   }
 
-  function handleSave(e) {
-    e.stopPropagation();
+  const [saved, setSaved] = useState(() => {
+    return getSavedCommunities().some(
+      (item) => String(item.id ?? item.community_id) === String(communityId),
+    );
+  });
 
-    const currentUser = localStorage.getItem("currentUser");
+  const image =
+    community.image ||
+    community.banner_url ||
+    "/C-Image(BandungGoCommunity).svg";
 
-    if (!currentUser) {
-      onAuthRequired(community);
+  const category =
+    community.category ||
+    (Array.isArray(community.categories)
+      ? community.categories.join(", ")
+      : "—");
+
+  const members = Number(community.members ?? community.member_count ?? 0);
+
+  const upcomingEvents = Number(
+    community.upcomingEvents ?? community.upcoming_count ?? 0,
+  );
+
+  async function handleJoin() {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      onAuthRequired?.(community);
       return;
     }
 
-    const savedCommunities =
-      JSON.parse(localStorage.getItem("savedCommunities")) || [];
+    if (joining) return;
+
+    setJoining(true);
+    setJoinError("");
+
+    try {
+      await onJoinChange(community);
+    } catch (error) {
+      setJoinError(error.message || "Failed to update community membership");
+    } finally {
+      setJoining(false);
+    }
+  }
+
+  function handleSave(event) {
+    event.stopPropagation();
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      onAuthRequired?.(community);
+      return;
+    }
+
+    const savedCommunities = getSavedCommunities();
 
     const alreadySaved = savedCommunities.some(
-      (item) => String(item.id) === String(community.id),
+      (item) => String(item.id ?? item.community_id) === String(communityId),
     );
+
+    const nextSaved = !alreadySaved;
 
     const updatedCommunities = alreadySaved
       ? savedCommunities.filter(
-          (item) => String(item.id) !== String(community.id),
+          (item) =>
+            String(item.id ?? item.community_id) !== String(communityId),
         )
-      : [...savedCommunities, community];
-
-    const nextSaved = !alreadySaved;
+      : [...savedCommunities, { ...community, id: communityId }];
 
     localStorage.setItem(
       "savedCommunities",
@@ -99,18 +105,17 @@ function CommunityCard({
     );
 
     setSaved(nextSaved);
-
-    onSavedChange(community, nextSaved);
+    onSavedChange?.(community, nextSaved);
   }
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
       <div
         className="h-44 w-full cursor-pointer overflow-hidden"
-        onClick={() => navigate(`/communities/${community.id}`)}
+        onClick={() => navigate(`/communities/${communityId}`)}
       >
         <img
-          src={community.image}
+          src={image}
           alt={community.name}
           className="h-full w-full object-cover"
         />
@@ -119,7 +124,7 @@ function CommunityCard({
       <div className="flex flex-1 flex-col space-y-3 px-4 py-4">
         <h3
           className="cursor-pointer text-lg font-semibold text-gray-900 dark:text-white"
-          onClick={() => navigate(`/communities/${community.id}`)}
+          onClick={() => navigate(`/communities/${communityId}`)}
         >
           {community.name}
         </h3>
@@ -130,19 +135,19 @@ function CommunityCard({
 
         <div className="flex flex-wrap gap-2">
           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-500">
-            {community.category}
+            {category}
           </span>
         </div>
 
         <div className="flex items-center gap-4 text-xs text-gray-secondary">
           <div className="flex items-center gap-1">
             <MdPeopleAlt />
-            <span>{community.members.toLocaleString("id-ID")} members</span>
+            <span>{members.toLocaleString("id-ID")} members</span>
           </div>
 
           <div className="flex items-center gap-1">
             <FiCalendar />
-            <span>{community.upcomingEvents} upcoming</span>
+            <span>{upcomingEvents} upcoming</span>
           </div>
         </div>
 
@@ -150,11 +155,12 @@ function CommunityCard({
           <button
             type="button"
             onClick={handleJoin}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium text-white-secondary hover:cursor-pointer ${
-              joined ? "bg-green-primary" : "bg-orange-primary"
+            disabled={joining}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+              joined ? "bg-green-600 hover:bg-green-700" : "bg-orange-primary"
             }`}
           >
-            {joined ? "Joined" : "Join Community"}
+            {joining ? "Processing..." : joined ? "Joined" : "Join Community"}
           </button>
 
           <button
@@ -169,6 +175,12 @@ function CommunityCard({
           </button>
         </div>
       </div>
+
+      {joinError && (
+        <p role="alert" className="text-xs text-red-500">
+          {joinError}
+        </p>
+      )}
     </article>
   );
 }

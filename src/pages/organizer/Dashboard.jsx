@@ -1,26 +1,94 @@
+import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { SlCalender } from "react-icons/sl";
-import { GoPeople } from "react-icons/go";
+import { GoPeople, GoPencil } from "react-icons/go";
 import { FaArrowTrendUp, FaRegEye } from "react-icons/fa6";
-import { GoPencil } from "react-icons/go";
 import { useNavigate } from "react-router";
 import { useSelector } from "react-redux";
 
 import ChartDashboard from "../../components/ChartDashboard";
-import { getEvents } from "../../utils/eventStorage";
+import { getMyEvents } from "../../services/eventsService";
+
+function getAttendeeCount(event) {
+  const value =
+    event.attendee_count ??
+    event.attendees_count ??
+    event.total_attendees ??
+    event.attendees;
+
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const count = Number(value);
+
+  return Number.isFinite(count) ? count : null;
+}
+
+function getBannerUrl(event) {
+  const banner = event.banner_url || event.image || "";
+
+  if (!banner) return "";
+
+  if (
+    banner.startsWith("http://") ||
+    banner.startsWith("https://") ||
+    banner.startsWith("data:")
+  ) {
+    return banner;
+  }
+
+  const baseUrl = (
+    import.meta.env.VITE_API_URL || "http://localhost:8500"
+  ).replace(/\/$/, "");
+
+  return banner.startsWith("/")
+    ? `${baseUrl}${banner}`
+    : `${baseUrl}/${banner}`;
+}
 
 function Dashboard() {
   const navigate = useNavigate();
 
   const currentUser = useSelector((state) => state.auth.user);
 
-  const allEvents = getEvents();
+  const role = currentUser?.role;
 
-  //Dashboard organizer
-  if (currentUser?.role !== "organizer") {
+  const [myEvents, setMyEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (role !== "organizer") return;
+
+    const controller = new AbortController();
+
+    getMyEvents(controller.signal)
+      .then((events) => {
+        if (!controller.signal.aborted) {
+          setMyEvents(events);
+          setError("");
+        }
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          setError(err.message || "Failed to load your events.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [role]);
+
+  if (role !== "organizer") {
     return (
       <div className="p-10 text-center">
         <h1 className="text-2xl font-bold">Access denied</h1>
+
         <p className="mt-2 text-gray-secondary">
           Halaman ini hanya dapat diakses oleh organizer.
         </p>
@@ -28,28 +96,44 @@ function Dashboard() {
     );
   }
 
-  // event tanpa organizerId dianggap data lama
-  const myEvents = allEvents.filter(
-    (event) =>
-      !event.organizerId ||
-      String(event.organizerId) === String(currentUser.id),
-  );
+  const attendeeCounts = myEvents.map(getAttendeeCount);
 
-  const totalAttendees = myEvents.reduce(
-    (total, event) => total + Number(event.attendees || 0),
-    0,
-  );
+  const hasAttendeeData = attendeeCounts.every((count) => count !== null);
+
+  const totalAttendees =
+    myEvents.length === 0
+      ? 0
+      : hasAttendeeData
+        ? attendeeCounts.reduce((sum, count) => sum + count, 0)
+        : "—";
 
   const averageFillRate =
-    myEvents.length > 0
-      ? Math.round(
-          myEvents.reduce(
-            (total, event) =>
-              total + (Number(event.attendees || 0) / event.capacity) * 100,
-            0,
-          ) / myEvents.length,
-        )
-      : 0;
+    myEvents.length === 0
+      ? "0%"
+      : hasAttendeeData && myEvents.every((event) => Number(event.capacity) > 0)
+        ? `${Math.round(
+            myEvents.reduce(
+              (total, event) =>
+                total +
+                (getAttendeeCount(event) / Number(event.capacity)) * 100,
+              0,
+            ) / myEvents.length,
+          )}%`
+        : "—";
+
+  const hasViewsData = myEvents.every(
+    (event) =>
+      event.views !== undefined &&
+      event.views !== null &&
+      Number.isFinite(Number(event.views)),
+  );
+
+  const totalViews =
+    myEvents.length === 0
+      ? 0
+      : hasViewsData
+        ? myEvents.reduce((sum, event) => sum + Number(event.views), 0)
+        : "—";
 
   const total = [
     {
@@ -66,16 +150,13 @@ function Dashboard() {
     },
     {
       title: "AVG FILL RATE",
-      count: `${averageFillRate}%`,
+      count: averageFillRate,
       sub: "Capacity utilization",
       logo: FaArrowTrendUp,
     },
     {
       title: "EVENT VIEWS",
-      count: myEvents.reduce(
-        (total, event) => total + Number(event.views || 0),
-        0,
-      ),
+      count: totalViews,
       sub: "All time",
       logo: FaRegEye,
     },
@@ -121,7 +202,9 @@ function Dashboard() {
                 <Icon className="text-gray-secondary" />
               </div>
 
-              <p className="mt-4 text-2xl font-bold">{item.count}</p>
+              <p className="mt-4 text-2xl font-bold">
+                {loading ? "..." : item.count}
+              </p>
 
               <p className="text-xs text-gray-secondary">{item.sub}</p>
             </div>
@@ -133,25 +216,63 @@ function Dashboard() {
         <section>
           <h2 className="mb-5 text-xl font-bold">Your Events</h2>
 
+          {loading && (
+            <p className="text-sm text-gray-secondary">
+              Loading your events...
+            </p>
+          )}
+
+          {error && !loading && (
+            <div
+              role="alert"
+              className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600"
+            >
+              {error}
+            </div>
+          )}
+
           <div className="space-y-4">
-            {myEvents.length === 0 ? (
+            {!loading && !error && myEvents.length === 0 && (
               <p className="text-sm text-gray-secondary">Belum ada event.</p>
-            ) : (
-              myEvents.map((event) => {
-                const percentage = Math.round(
-                  (event.attendees / event.capacity) * 100,
-                );
+            )}
+
+            {!loading &&
+              !error &&
+              myEvents.map((event, index) => {
+                const eventId = event.event_id ?? event.id;
+
+                const attendees = getAttendeeCount(event);
+                const capacity = Number(event.capacity) || 0;
+
+                const percentage =
+                  attendees !== null && capacity > 0
+                    ? Math.round((attendees / capacity) * 100)
+                    : null;
+
+                const safePercentage =
+                  percentage === null
+                    ? 0
+                    : Math.min(100, Math.max(0, percentage));
+
+                const bannerUrl = getBannerUrl(event);
+                const status = event.status || "Created";
 
                 return (
                   <div
-                    key={event.id}
+                    key={eventId ?? index}
                     className="flex gap-4 rounded-xl border border-gray-200 bg-white p-4"
                   >
-                    <img
-                      src={event.image}
-                      alt={event.title}
-                      className="h-20 w-24 rounded-lg object-cover"
-                    />
+                    {bannerUrl ? (
+                      <img
+                        src={bannerUrl}
+                        alt={event.title}
+                        className="h-20 w-24 shrink-0 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-20 w-24 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
+                        No Image
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex justify-between gap-3">
@@ -159,33 +280,41 @@ function Dashboard() {
                           <h3 className="font-semibold">{event.title}</h3>
 
                           <p className="text-sm text-gray-secondary">
-                            {event.date} · {event.location}
+                            {String(event.event_date || "").slice(0, 10)}
+                            {" · "}
+                            {event.location || "-"}
                           </p>
                         </div>
 
                         <span className="h-fit rounded-full bg-green-100 px-3 py-1 text-xs text-green-700">
-                          Active
+                          {status}
                         </span>
                       </div>
 
                       <div className="mt-4 flex justify-between text-xs text-gray-secondary">
-                        <span>{event.attendees} attendees</span>
-                        <span>{event.capacity} capacity</span>
+                        <span>
+                          {attendees === null ? "—" : attendees} attendees
+                        </span>
+
+                        <span>{capacity} capacity</span>
                       </div>
 
                       <div className="mt-2 h-2 rounded-full bg-gray-200">
                         <div
                           className="h-2 rounded-full bg-green-500"
-                          style={{ width: `${percentage}%` }}
+                          style={{
+                            width: `${safePercentage}%`,
+                          }}
                         />
                       </div>
 
                       <button
                         type="button"
+                        disabled={eventId == null}
                         onClick={() =>
-                          navigate(`/dashboard/events/${event.id}/edit`)
+                          navigate(`/dashboard/events/${eventId}/edit`)
                         }
-                        className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm"
+                        className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:border-orange-primary disabled:opacity-50"
                       >
                         <GoPencil />
                         Edit
@@ -193,8 +322,7 @@ function Dashboard() {
                     </div>
                   </div>
                 );
-              })
-            )}
+              })}
           </div>
         </section>
 

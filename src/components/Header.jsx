@@ -10,6 +10,7 @@ import ThemeToggle from "./ThemeToggle";
 //redux
 import { useAppSelector, useAppDispatch } from "../hooks/reduxHooks";
 import { logout } from "../redux/slice/authSlice";
+import { logoutUser } from "../services/authService";
 
 function Header() {
   const navigate = useNavigate();
@@ -26,12 +27,19 @@ function Header() {
   const currentUser = useAppSelector((state) => state.auth.user);
   const dispatch = useAppDispatch();
 
-  function handleLogout() {
-    dispatch(logout());
+  async function handleLogout() {
+    try {
+      await logoutUser();
 
-    setIsOpen(false);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
 
-    navigate("/signin");
+      dispatch(logout());
+      setIsOpen(false);
+      navigate("/signin");
+    } catch (error) {
+      console.error(error.message);
+    }
   }
 
   return (

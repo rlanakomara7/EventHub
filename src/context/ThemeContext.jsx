@@ -1,6 +1,5 @@
-import { createContext, useEffect, useState, useContext } from "react";
-
-const ThemeContext = createContext(null);
+import { useEffect, useState } from "react";
+import { ThemeContext } from "./theme-context";
 
 export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
@@ -23,14 +22,4 @@ export function ThemeProvider({ children }) {
       {children}
     </ThemeContext.Provider>
   );
-}
-
-export function useTheme() {
-  const context = useContext(ThemeContext);
-
-  if (!context) {
-    throw new Error("Gunakan di ThemeProvider");
-  }
-
-  return context;
 }

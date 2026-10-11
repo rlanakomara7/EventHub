@@ -2,7 +2,7 @@ import { FiCalendar } from "react-icons/fi";
 import { FaBookmark } from "react-icons/fa";
 import { MdPeopleAlt } from "react-icons/md";
 import { FaLocationPin } from "react-icons/fa6";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 function EventCard({
   event,
@@ -12,40 +12,49 @@ function EventCard({
   isRegistered = false,
 }) {
   //state
-  const [registered, setRegistered] = useState(isRegistered);
+  const [registered, setRegistered] = useState(() => {
+    try {
+      const registeredEvents = JSON.parse(
+        localStorage.getItem("registeredEvents") || "[]",
+      );
 
-  //ceklocalstorage
-  useEffect(() => {
-    const registeredEvents =
-      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+      const alreadyRegistered =
+        Array.isArray(registeredEvents) &&
+        registeredEvents.some(
+          (item) => String(item.event_id) === String(event.event_id),
+        );
 
-    const alreadyRegistered = registeredEvents.some(
-      (item) => String(item.id) === String(event.id),
-    );
+      return isRegistered || alreadyRegistered;
+    } catch {
+      return isRegistered;
+    }
+  });
 
-    setRegistered(alreadyRegistered);
-  }, [event.id, isRegistered]);
-
-  const percentage = (event.attendees / event.capacity) * 100;
+  const percentage =
+    event.capacity > 0 ? (event.attendee_count / event.capacity) * 100 : 0;
 
   const [saved, setSaved] = useState(() => {
     const savedEvents = JSON.parse(localStorage.getItem("savedEvents")) || [];
 
-    return savedEvents.some((item) => String(item.id) === String(event.id));
+    return savedEvents.some(
+      (item) => String(item.event_id) === String(event.event_id),
+    );
   });
 
-  // REVISI 3: fungsi Save dan Unsave
+  //Save dan Unsave
   function handleSave(e) {
     e.stopPropagation();
 
     const savedEvents = JSON.parse(localStorage.getItem("savedEvents")) || [];
 
     const alreadySaved = savedEvents.some(
-      (item) => String(item.id) === String(event.id),
+      (item) => String(item.event_id) === String(event.event_id),
     );
 
     const updatedEvents = alreadySaved
-      ? savedEvents.filter((item) => String(item.id) !== String(event.id))
+      ? savedEvents.filter(
+          (item) => String(item.event_id) !== String(event.event_id),
+        )
       : [...savedEvents, event];
 
     const nextSaved = !alreadySaved;
@@ -61,9 +70,12 @@ function EventCard({
   return (
     <>
       <article className="flex flex-col h-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
-        <div onClick={() => onEventClick(event.id)} className="cursor-pointer">
+        <div
+          onClick={() => onEventClick(event.event_id)}
+          className="cursor-pointer"
+        >
           <img
-            src={event.image}
+            src={event.banner_url}
             alt={event.title}
             className="h-full w-full object-cover"
           />
@@ -71,16 +83,29 @@ function EventCard({
 
         <div className="px-4 py-2 align-bottom space-y-2">
           <h3
-            onClick={() => onEventClick(event.id)}
+            onClick={() => onEventClick(event.event_id)}
             className="font-bold text-2xl py-2"
           >
             {event.title}
           </h3>
 
+          {event.categories?.length > 0 && (
+            <div>
+              {event.categories.map((category) => (
+                <span
+                  key={category}
+                  className="rounded-full bg-orange-primary/10 px-2 py-1 text-xs text-orange-primary"
+                >
+                  {category}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-row items-center gap-2 text-gray-secondary">
             <FiCalendar />
             <p>
-              {event.date} . {event.time}
+              {event.event_date} . {event.event_time}
             </p>
           </div>
 
@@ -98,7 +123,7 @@ function EventCard({
         </div>
         <div className="px-4 py-2 space-y-4">
           <div className="flex flex-row justify-between  text-gray-secondary">
-            <p>{event.attendees}attendees</p>
+            <p>{event.attendee_count}attendees</p>
             <p>{event.capacity}capacity</p>
           </div>
           <div className="">
@@ -123,7 +148,7 @@ function EventCard({
               onAuthRequired(event);
 
               // Kalau belum login, jangan ubah tombol
-              if (!localStorage.getItem("currentUser")) {
+              if (!localStorage.getItem("token")) {
                 return;
               }
 
