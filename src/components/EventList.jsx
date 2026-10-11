@@ -1,19 +1,24 @@
 import EventCard from "./EventCard";
 
-function EventList({ events, onAuthRequired, onEventClick }) {
+function EventList({
+  events = [],
+  onAuthRequired,
+  onEventClick,
+  onSavedChange,
+}) {
   return (
-    <>
-      <main className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {events.map((event) => (
+    <div className="grid w-full min-w-0 max-w-full grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {events.map((event) => (
+        <div key={event.event_id ?? event.id} className="min-w-0">
           <EventCard
-            key={event.event_id}
             event={event}
             onAuthRequired={onAuthRequired}
             onEventClick={onEventClick}
+            onSavedChange={onSavedChange}
           />
-        ))}
-      </main>
-    </>
+        </div>
+      ))}
+    </div>
   );
 }
 
