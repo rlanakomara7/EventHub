@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { SlCalender } from "react-icons/sl";
-import { GoPeople, GoPencil } from "react-icons/go";
+import { GoPeople, GoPencil, GoTrash } from "react-icons/go";
 import { FaArrowTrendUp, FaRegEye } from "react-icons/fa6";
 import { useNavigate } from "react-router";
 import { useSelector } from "react-redux";
 
 import ChartDashboard from "../../components/ChartDashboard";
 import { getMyEvents } from "../../services/eventsService";
+import { deleteEvent } from "../../services/eventDeleteService";
 
 function getAttendeeCount(event) {
   const value =
@@ -58,6 +59,11 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  //  Status hapus event
+  const [deletingEventId, setDeletingEventId] = useState(null);
+  const [deleteError, setDeleteError] = useState("");
+
+  //  Ambil event organizer dari backend
   useEffect(() => {
     if (role !== "organizer") return;
 
@@ -83,6 +89,34 @@ function Dashboard() {
 
     return () => controller.abort();
   }, [role]);
+
+  // Delete Event melalui API
+  async function handleDelete(eventId, eventTitle) {
+    if (!eventId || deletingEventId !== null) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete "${eventTitle}"?\n\nThis action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    setDeleteError("");
+    setDeletingEventId(eventId);
+
+    try {
+      await deleteEvent(eventId);
+
+      setMyEvents((previous) =>
+        previous.filter(
+          (event) => String(event.event_id ?? event.id) !== String(eventId),
+        ),
+      );
+    } catch (err) {
+      setDeleteError(err.message || "Failed to delete event.");
+    } finally {
+      setDeletingEventId(null);
+    }
+  }
 
   if (role !== "organizer") {
     return (
@@ -231,6 +265,16 @@ function Dashboard() {
             </div>
           )}
 
+          {/* Tampilkan error jika DELETE gagal */}
+          {deleteError && (
+            <div
+              role="alert"
+              className="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-600"
+            >
+              {deleteError}
+            </div>
+          )}
+
           <div className="space-y-4">
             {!loading && !error && myEvents.length === 0 && (
               <p className="text-sm text-gray-secondary">Belum ada event.</p>
@@ -242,6 +286,7 @@ function Dashboard() {
                 const eventId = event.event_id ?? event.id;
 
                 const attendees = getAttendeeCount(event);
+
                 const capacity = Number(event.capacity) || 0;
 
                 const percentage =
@@ -256,6 +301,8 @@ function Dashboard() {
 
                 const bannerUrl = getBannerUrl(event);
                 const status = event.status || "Created";
+
+                const isDeleting = deletingEventId === eventId;
 
                 return (
                   <div
@@ -308,17 +355,30 @@ function Dashboard() {
                         />
                       </div>
 
-                      <button
-                        type="button"
-                        disabled={eventId == null}
-                        onClick={() =>
-                          navigate(`/dashboard/events/${eventId}/edit`)
-                        }
-                        className="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:border-orange-primary disabled:opacity-50"
-                      >
-                        <GoPencil />
-                        Edit
-                      </button>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={eventId == null || deletingEventId !== null}
+                          onClick={() =>
+                            navigate(`/dashboard/events/${eventId}/edit`)
+                          }
+                          className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm hover:border-orange-primary disabled:opacity-50"
+                        >
+                          <GoPencil />
+                          Edit
+                        </button>
+
+                        {/* ✅ TAMBAH: Tombol Delete */}
+                        <button
+                          type="button"
+                          disabled={eventId == null || deletingEventId !== null}
+                          onClick={() => handleDelete(eventId, event.title)}
+                          className="flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <GoTrash />
+                          {isDeleting ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
