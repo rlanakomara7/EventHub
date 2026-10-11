@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useSelector } from "react-redux";
 
+import { createEvent } from "../../services/eventsService";
+import { getCommunities } from "../../services/communityService";
 import { getEvents, saveEvents, deleteEvent } from "../../utils/eventStorage";
 
 const emptyForm = {
@@ -27,7 +29,6 @@ function formatDateForInput(value) {
   }
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return "";
 
   return date.toISOString().split("T")[0];
@@ -41,31 +42,24 @@ function formatTimeForInput(value) {
 function EventForm({ mode = "create" }) {
   const navigate = useNavigate();
   const { id } = useParams();
-
   const currentUser = useSelector((state) => state.auth.user);
-
-  const [step, setStep] = useState(1);
-
-  const [form, setForm] = useState(emptyForm);
-  const [speakerInput, setSpeakerInput] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
 
   const isEdit = mode === "edit";
 
-  useEffect(() => {
-    if (!isEdit) return;
+  const [selectedEvent] = useState(() => {
+    if (!isEdit) return null;
 
-    const selectedEvent = getEvents().find(
-      (item) => String(item.id) === String(id),
-    );
+    return getEvents().find((item) => String(item.id) === String(id)) || null;
+  });
 
+  const [step, setStep] = useState(1);
+
+  const [form, setForm] = useState(() => {
     if (!selectedEvent) {
-      setError("Event not found.");
-      return;
+      return { ...emptyForm };
     }
 
-    setForm({
+    return {
       title: selectedEvent.title || "",
       description: selectedEvent.description || "",
       category: selectedEvent.category || "",
@@ -80,8 +74,40 @@ function EventForm({ mode = "create" }) {
       speakers: Array.isArray(selectedEvent.speakers)
         ? selectedEvent.speakers
         : [],
-    });
-  }, [id, isEdit]);
+    };
+  });
+
+  const [speakerInput, setSpeakerInput] = useState("");
+  const [bannerFile, setBannerFile] = useState(null);
+  const [availableCommunities, setAvailableCommunities] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [error, setError] = useState(
+    isEdit && !selectedEvent ? "Event not found." : "",
+  );
+
+  const [success, setSuccess] = useState(false);
+
+  // ✅ TAMBAH: Mengambil komunitas dari backend
+  useEffect(() => {
+    if (isEdit) return;
+
+    const controller = new AbortController();
+
+    getCommunities("", "", controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setAvailableCommunities(data);
+        }
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") {
+          console.error("Failed to load communities:", err.message);
+        }
+      });
+
+    return () => controller.abort();
+  }, [isEdit]);
 
   if (currentUser?.role !== "organizer") {
     return (
@@ -107,7 +133,9 @@ function EventForm({ mode = "create" }) {
           </h1>
 
           <p className="mt-1 text-sm text-gray-400">
-            Redirecting to your dashboard...
+            {isEdit
+              ? "Redirecting to your dashboard..."
+              : "Redirecting to event list..."}
           </p>
         </div>
       </main>
@@ -136,12 +164,19 @@ function EventForm({ mode = "create" }) {
 
         img.onload = () => {
           const scale = Math.min(1, maxWidth / img.width);
+
           const canvas = document.createElement("canvas");
 
           canvas.width = img.width * scale;
           canvas.height = img.height * scale;
 
           const ctx = canvas.getContext("2d");
+
+          if (!ctx) {
+            reject(new Error("Canvas is not available."));
+            return;
+          }
+
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
           resolve(canvas.toDataURL("image/jpeg", quality));
@@ -154,8 +189,24 @@ function EventForm({ mode = "create" }) {
     });
   }
 
+  // 🔄 UBAH: Preview menggunakan base64,
+  // tetapi upload ke backend menggunakan File asli
   async function processImageFile(file) {
     if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("File must be JPG, PNG, or WEBP.");
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Maximum file size is 2 MB.");
+      return;
+    }
+
+    setError("");
 
     try {
       const resizedDataUrl = await resizeImageFile(file);
@@ -164,6 +215,8 @@ function EventForm({ mode = "create" }) {
         ...previous,
         image: resizedDataUrl,
       }));
+
+      setBannerFile(file);
     } catch {
       setError("Failed to process the image. Please try a different file.");
     }
@@ -175,7 +228,6 @@ function EventForm({ mode = "create" }) {
 
   function handleDrop(event) {
     event.preventDefault();
-
     processImageFile(event.dataTransfer.files?.[0]);
   }
 
@@ -203,7 +255,7 @@ function EventForm({ mode = "create" }) {
     setError("");
 
     if (step === 1) {
-      if (!form.title || !form.category) {
+      if (!form.title.trim() || !form.category) {
         setError("Please complete the event title and category.");
         return false;
       }
@@ -214,10 +266,15 @@ function EventForm({ mode = "create" }) {
         !form.date ||
         !form.time ||
         !form.endTime ||
-        !form.location ||
-        !form.capacity
+        !form.location.trim() ||
+        Number(form.capacity) <= 0
       ) {
         setError("Please complete the date, time, location, and capacity.");
+        return false;
+      }
+
+      if (form.endTime <= form.time) {
+        setError("End time must be after start time.");
         return false;
       }
     }
@@ -227,7 +284,6 @@ function EventForm({ mode = "create" }) {
 
   function handleContinue() {
     if (!validateStep()) return;
-
     setStep((previous) => previous + 1);
   }
 
@@ -243,6 +299,7 @@ function EventForm({ mode = "create" }) {
     }
   }
 
+  // Edit/Delete masih localStorage sampai endpoint tersedia
   function handleDelete() {
     const events = getEvents();
     const ownerId = currentUser.id || currentUser.email;
@@ -254,7 +311,6 @@ function EventForm({ mode = "create" }) {
       return;
     }
 
-    // punya organizerId hanya boleh dihapus oleh pemiliknya.
     if (
       selectedEvent.organizerId &&
       String(selectedEvent.organizerId) !== String(ownerId)
@@ -270,79 +326,74 @@ function EventForm({ mode = "create" }) {
     if (!confirmed) return;
 
     deleteEvent(id);
-
     navigate("/dashboard");
   }
 
-  function handleSubmit(event) {
+  // 🔄 UBAH: Create Event disimpan melalui backend API
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    if (step !== 3) {
+    if (step !== 3 || submitting) return;
+
+    setError("");
+
+    if (!isEdit) {
+      setSubmitting(true);
+
+      try {
+        await createEvent(form, bannerFile);
+
+        setSuccess(true);
+
+        window.setTimeout(() => {
+          navigate("/event");
+        }, 1800);
+      } catch (err) {
+        setError(err.message || "Failed to publish event.");
+      } finally {
+        setSubmitting(false);
+      }
+
       return;
     }
 
+    // Edit sementara tetap memakai localStorage
     const events = getEvents();
     const ownerId = currentUser.id || currentUser.email;
 
+    const eventToEdit = events.find((item) => String(item.id) === String(id));
+
+    if (!eventToEdit) {
+      setError("Event not found.");
+      return;
+    }
+
+    if (
+      eventToEdit.organizerId &&
+      String(eventToEdit.organizerId) !== String(ownerId)
+    ) {
+      setError("You do not have permission to edit this event.");
+      return;
+    }
+
+    const updatedEvents = events.map((item) =>
+      String(item.id) === String(id)
+        ? {
+            ...item,
+            ...form,
+            capacity: Number(form.capacity),
+            time: `${form.time} WIB`,
+            endTime: `${form.endTime} WIB`,
+            organizerId: item.organizerId || ownerId,
+            organizerName: item.organizerName || currentUser.name,
+          }
+        : item,
+    );
+
     try {
-      if (isEdit) {
-        const selectedEvent = events.find(
-          (item) => String(item.id) === String(id),
-        );
-
-        if (!selectedEvent) {
-          setError("Event not found.");
-          return;
-        }
-
-        if (
-          selectedEvent.organizerId &&
-          String(selectedEvent.organizerId) !== String(ownerId)
-        ) {
-          setError("You do not have permission to edit this event.");
-          return;
-        }
-
-        const updatedEvents = events.map((item) =>
-          String(item.id) === String(id)
-            ? {
-                ...item,
-                ...form,
-                capacity: Number(form.capacity),
-                time: `${form.time} WIB`,
-                endTime: `${form.endTime} WIB`,
-                organizerId: item.organizerId || ownerId,
-                organizerName: item.organizerName || currentUser.name,
-              }
-            : item,
-        );
-
-        saveEvents(updatedEvents);
-      } else {
-        const newEvent = {
-          ...form,
-          id: Date.now(),
-          attendees: 0,
-          views: 0,
-          capacity: Number(form.capacity),
-          time: `${form.time} WIB`,
-          endTime: `${form.endTime} WIB`,
-          organizerId: ownerId,
-          organizerName: currentUser.name,
-        };
-
-        saveEvents([...events, newEvent]);
-      }
-    } catch (storageError) {
-      if (storageError?.name === "QuotaExceededError") {
-        setError(
-          "Storage is full. Try removing the cover image or using a smaller one, then submit again.",
-        );
-      } else {
-        setError(
-          "Something went wrong while saving the event. Please try again.",
-        );
-      }
+      saveEvents(updatedEvents);
+    } catch {
+      setError("Failed to save event changes.");
       return;
     }
 
@@ -433,11 +484,13 @@ function EventForm({ mode = "create" }) {
                   ) : (
                     <div className="text-center text-gray-400">
                       <div className="text-2xl">⇧</div>
+
                       <p className="mt-1 text-sm">
                         Click to upload or drag and drop
                       </p>
+
                       <p className="text-xs">
-                        PNG, JPG up to 10MB · 16:9 recommended
+                        PNG, JPG, WEBP up to 2MB · 16:9 recommended
                       </p>
                     </div>
                   )}
@@ -446,7 +499,7 @@ function EventForm({ mode = "create" }) {
                 <input
                   id="coverImage"
                   type="file"
-                  accept="image/png,image/jpeg"
+                  accept="image/png,image/jpeg,image/webp"
                   onChange={handleImageChange}
                   className="hidden"
                 />
@@ -496,9 +549,9 @@ function EventForm({ mode = "create" }) {
                   <option value="Technology">Technology</option>
                   <option value="Design">Design</option>
                   <option value="Business">Business</option>
-                  <option value="Music">Music</option>
                   <option value="AI">AI</option>
                   <option value="Programming">Programming</option>
+                  <option value="Career">Career</option>
                 </select>
               </div>
 
@@ -508,6 +561,7 @@ function EventForm({ mode = "create" }) {
                   <span className="font-normal text-gray-400">(optional)</span>
                 </label>
 
+                {/* 🔄 UBAH: Komunitas dari PostgreSQL */}
                 <select
                   name="community"
                   value={form.community}
@@ -515,11 +569,19 @@ function EventForm({ mode = "create" }) {
                   className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
                 >
                   <option value="">No community</option>
-                  <option value="Developer Community">
-                    Developer Community
-                  </option>
-                  <option value="Design Community">Design Community</option>
-                  <option value="Business Community">Business Community</option>
+
+                  {isEdit && form.community && (
+                    <option value={form.community}>{form.community}</option>
+                  )}
+
+                  {availableCommunities.map((community) => (
+                    <option
+                      key={community.community_id}
+                      value={community.community_id}
+                    >
+                      {community.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </>
@@ -804,9 +866,14 @@ function EventForm({ mode = "create" }) {
               <button
                 key="submit-button"
                 type="submit"
-                className="rounded-lg bg-green-500 px-5 py-2.5 text-sm text-white hover:bg-green-600"
+                disabled={submitting}
+                className="rounded-lg bg-green-500 px-5 py-2.5 text-sm text-white hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                ✓ {isEdit ? "Save Changes" : "Publish Event"}
+                {submitting
+                  ? "Publishing..."
+                  : isEdit
+                    ? "✓ Save Changes"
+                    : "✓ Publish Event"}
               </button>
             )}
           </div>
