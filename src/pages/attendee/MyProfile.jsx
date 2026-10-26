@@ -1,12 +1,21 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 
 import EventCard from "../../components/EventCard";
 import CommunityCard from "../../components/CommunityCard";
 import MyProfileFilter from "../../components/MyProfileFilter";
 
-import { selectUser, updateProfile } from "../../redux/slice/authSlice";
+import {
+  selectUser,
+  selectProfileLoading,
+  selectProfileError,
+  fetchProfile,
+  updateProfile,
+  clearProfileError,
+} from "../../redux/slice/authSlice";
+
+import { getAvatarUrl } from "../../services/profileService";
 
 function readStorage(key) {
   try {
@@ -21,10 +30,13 @@ function MyProfile() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // REVISI: data user berasal dari Redux
   const user = useSelector(selectUser);
+  const profileLoading = useSelector(selectProfileLoading);
+  const profileError = useSelector(selectProfileError);
 
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [previewError, setPreviewError] = useState("");
 
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -52,33 +64,61 @@ function MyProfile() {
     readStorage("savedCommunities"),
   );
 
+  useEffect(() => {
+    if (!localStorage.getItem("token")) return;
+
+    const request = dispatch(fetchProfile());
+
+    return () => {
+      request.abort();
+    };
+  }, [dispatch]);
+
   function handleOpenEditProfile() {
+    dispatch(clearProfileError());
+    setPreviewError("");
+    setAvatarFile(null);
+
     setProfileForm({
       name: user?.name || "",
       email: user?.email || "",
-      location: user?.location || "Indonesia",
+      location: user?.location || "",
       bio: user?.bio || "",
-      avatar: user?.avatar || "/SON_9681.JPG",
+      avatar: user?.avatar || "",
     });
 
     setShowEditProfile(true);
   }
 
-  // REVISI: memilih foto baru
+  function handleCloseEditProfile() {
+    if (profileLoading) return;
+
+    setShowEditProfile(false);
+    setAvatarFile(null);
+    setPreviewError("");
+    dispatch(clearProfileError());
+  }
+
   function handlePhotoChange(e) {
     const file = e.target.files?.[0];
-
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Silakan pilih file gambar.");
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setPreviewError("File harus JPG, PNG, atau WEBP.");
+      e.target.value = "";
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Ukuran foto maksimal 2 MB.");
+      setPreviewError("Ukuran foto maksimal 2 MB.");
+      e.target.value = "";
       return;
     }
+
+    setPreviewError("");
+    setAvatarFile(file);
 
     const reader = new FileReader();
 
@@ -89,26 +129,39 @@ function MyProfile() {
       }));
     };
 
+    reader.onerror = () => {
+      setAvatarFile(null);
+      setPreviewError("Gagal membaca gambar.");
+    };
+
     reader.readAsDataURL(file);
   }
 
-  function handleSaveProfile(e) {
+  async function handleSaveProfile(e) {
     e.preventDefault();
 
-    if (!profileForm.name.trim()) {
+    if (profileLoading) return;
+
+    if (profileForm.name.trim().length < 2) {
+      setPreviewError("Nama minimal 2 karakter.");
       return;
     }
 
-    dispatch(
-      updateProfile({
-        name: profileForm.name.trim(),
-        location: profileForm.location.trim(),
-        bio: profileForm.bio.trim(),
-        avatar: profileForm.avatar,
-      }),
-    );
+    setPreviewError("");
 
-    setShowEditProfile(false);
+    try {
+      await dispatch(
+        updateProfile({
+          form: profileForm,
+          avatarFile,
+        }),
+      ).unwrap();
+
+      setAvatarFile(null);
+      setShowEditProfile(false);
+    } catch {
+      // Pesan error ditangani oleh Redux.
+    }
   }
 
   function handleEventClick(eventId) {
@@ -182,7 +235,7 @@ function MyProfile() {
   function renderEventCard(event) {
     return (
       <EventCard
-        key={event.id}
+        key={event.id ?? event.event_id}
         event={event}
         isRegistered={registeredEvents.some(
           (item) => String(item.id) === String(event.id),
@@ -197,7 +250,7 @@ function MyProfile() {
   function renderCommunityCard(community) {
     return (
       <CommunityCard
-        key={community.id}
+        key={community.id ?? community.community_id}
         community={community}
         isJoined={joinedCommunities.some(
           (item) => String(item.id) === String(community.id),
@@ -212,179 +265,186 @@ function MyProfile() {
   }
 
   return (
-    <>
-      <div className="mt-10 dark:text-white">
-        <div className="mx-auto flex max-w-4xl items-start justify-between">
-          <div className="flex gap-5">
-            <div className="relative">
-              {/*foto user */}
-              <img
-                src={user?.avatar || "/SON_9681.JPG"}
-                alt={user?.name || "Profile"}
-                className="h-20 w-20 rounded-2xl object-cover"
-              />
+    <div className="mt-10 dark:text-white">
+      <div className="mx-auto flex max-w-4xl items-start justify-between gap-4 px-4">
+        <div className="flex gap-5">
+          <div className="relative shrink-0">
+            <img
+              src={getAvatarUrl(user?.avatar)}
+              alt={user?.name || "Profile"}
+              className="h-20 w-20 rounded-2xl object-cover"
+            />
+            <span className="absolute right-0 top-0 h-4 w-4 rounded-md border-2 border-white bg-green-500" />
+          </div>
 
-              <span className="absolute right-0 top-0 h-4 w-4 rounded-md border-2 border-white bg-green-500" />
-            </div>
+          <div className="flex flex-col">
+            <h2 className="text-2xl font-bold">{user?.name || "User"}</h2>
 
-            <div className="flex flex-col">
-              <h2 className="text-2xl font-bold">{user?.name || "User"}</h2>
+            <p className="text-gray-500">{user?.email || "-"}</p>
 
-              <p className="text-gray-500">{user?.email || "-"}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+              <span>{user?.location || "Indonesia"}</span>
 
-              <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
-                <span>📍{user?.location || "Indonesia"}</span>
-
-                <span>▣ Joined March 2025</span>
-
-                <span className="rounded-full bg-orange-100 px-2 py-1 text-orange-500">
-                  {user?.role || "Attendee"}
+              {user?.joinedAt && (
+                <span>
+                  Joined {new Date(user.joinedAt).toLocaleDateString("id-ID")}
                 </span>
-              </div>
+              )}
 
-              <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
-                {user?.bio || "Belum ada informasi bio."}
-              </p>
+              <span className="rounded-full bg-orange-100 px-2 py-1 text-orange-500">
+                {user?.role || "Attendee"}
+              </span>
             </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={handleOpenEditProfile}
-            className="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
-          >
-            ✎ Edit Profile
-          </button>
-        </div>
-
-        <div className="mx-auto mt-8 grid max-w-4xl grid-cols-3 py-5 text-center">
-          <div>
-            <h3 className="text-2xl font-bold">{registeredEvents.length}</h3>
-            <p className="text-gray-500">Events</p>
-          </div>
-
-          <div className="border-x border-gray-300">
-            <h3 className="text-2xl font-bold">{joinedCommunities.length}</h3>
-            <p className="text-gray-500">Communities</p>
-          </div>
-
-          <div>
-            <h3 className="text-2xl font-bold">
-              {savedEvents.length + savedCommunities.length}
-            </h3>
-            <p className="text-gray-500">Saved</p>
+            <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
+              {user?.bio || "Belum ada informasi bio."}
+            </p>
           </div>
         </div>
 
-        <div className="mx-auto max-w-4xl">
-          <MyProfileFilter activeTab={activeTab} setActiveTab={setActiveTab} />
-        </div>
-
-        <section className="min-h-screen bg-white-secondary py-6">
-          <div className="mx-auto max-w-6xl px-6">
-            {activeTab === "events" && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {registeredEvents.length > 0 ? (
-                  registeredEvents.map(renderEventCard)
-                ) : (
-                  <p className="text-sm text-gray-secondary">
-                    Belum ada event yang diikuti.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {activeTab === "communities" && (
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {joinedCommunities.length > 0 ? (
-                  joinedCommunities.map(renderCommunityCard)
-                ) : (
-                  <p className="text-sm text-gray-secondary">
-                    Belum ada community yang diikuti.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {activeTab === "saved" && (
-              <div className="space-y-8">
-                <div>
-                  <h2 className="mb-4 text-lg font-semibold">Saved Events</h2>
-
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {savedEvents.length > 0 ? (
-                      savedEvents.map(renderEventCard)
-                    ) : (
-                      <p className="text-sm text-gray-secondary">
-                        Belum ada event yang disimpan.
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h2 className="mb-4 text-lg font-semibold">
-                    Saved Communities
-                  </h2>
-
-                  <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                    {savedCommunities.length > 0 ? (
-                      savedCommunities.map(renderCommunityCard)
-                    ) : (
-                      <p className="text-sm text-gray-secondary">
-                        Belum ada community yang disimpan.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
+        <button
+          type="button"
+          onClick={handleOpenEditProfile}
+          className="shrink-0 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+        >
+          Edit Profile
+        </button>
       </div>
 
-      {/* modal Edit Profile */}
+      <div className="mx-auto mt-8 grid max-w-4xl grid-cols-3 py-5 text-center">
+        <div>
+          <h3 className="text-2xl font-bold">{registeredEvents.length}</h3>
+          <p className="text-gray-500">Events</p>
+        </div>
+
+        <div className="border-x border-gray-300">
+          <h3 className="text-2xl font-bold">{joinedCommunities.length}</h3>
+          <p className="text-gray-500">Communities</p>
+        </div>
+
+        <div>
+          <h3 className="text-2xl font-bold">
+            {savedEvents.length + savedCommunities.length}
+          </h3>
+          <p className="text-gray-500">Saved</p>
+        </div>
+      </div>
+
+      <div className="mx-auto max-w-4xl">
+        <MyProfileFilter activeTab={activeTab} setActiveTab={setActiveTab} />
+      </div>
+
+      <section className="min-h-screen bg-white-secondary py-6">
+        <div className="mx-auto max-w-6xl px-6">
+          {activeTab === "events" && (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {registeredEvents.length > 0 ? (
+                registeredEvents.map(renderEventCard)
+              ) : (
+                <p className="text-sm text-gray-secondary">
+                  Belum ada event yang diikuti.
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "communities" && (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {joinedCommunities.length > 0 ? (
+                joinedCommunities.map(renderCommunityCard)
+              ) : (
+                <p className="text-sm text-gray-secondary">
+                  Belum ada community yang diikuti.
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "saved" && (
+            <div className="space-y-8">
+              <div>
+                <h2 className="mb-4 text-lg font-semibold">Saved Events</h2>
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                  {savedEvents.length > 0 ? (
+                    savedEvents.map(renderEventCard)
+                  ) : (
+                    <p className="text-sm text-gray-secondary">
+                      Belum ada event yang disimpan.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h2 className="mb-4 text-lg font-semibold">
+                  Saved Communities
+                </h2>
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                  {savedCommunities.length > 0 ? (
+                    savedCommunities.map(renderCommunityCard)
+                  ) : (
+                    <p className="text-sm text-gray-secondary">
+                      Belum ada community yang disimpan.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
       {showEditProfile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 ">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <form
             onSubmit={handleSaveProfile}
-            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+            className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl dark:bg-zinc-900 dark:text-white"
           >
             <div className="flex items-center justify-between border-b pb-4">
               <h2 className="text-lg font-semibold">Edit Profile</h2>
 
               <button
                 type="button"
-                onClick={() => setShowEditProfile(false)}
+                onClick={handleCloseEditProfile}
+                disabled={profileLoading}
                 className="text-gray-500"
+                aria-label="Close edit profile"
               >
-                ✕
+                ×
               </button>
             </div>
 
             <div className="mt-5 space-y-4">
-              {/* REVISI: upload foto */}
               <div>
                 <img
-                  src={profileForm.avatar || "/SON_9681.JPG"}
-                  alt="Preview"
+                  src={getAvatarUrl(profileForm.avatar)}
+                  alt="Profile preview"
                   className="mb-3 h-20 w-20 rounded-2xl object-cover"
                 />
 
-                <label className="mb-1 block text-sm">Profile Photo</label>
+                <label htmlFor="profileAvatar" className="mb-1 block text-sm">
+                  Profile Photo
+                </label>
 
                 <input
+                  id="profileAvatar"
                   type="file"
-                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                  accept="image/png,image/jpeg,image/webp"
                   onChange={handlePhotoChange}
+                  disabled={profileLoading}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm">Full Name</label>
+                <label htmlFor="profileName" className="mb-1 block text-sm">
+                  Full Name
+                </label>
 
                 <input
+                  id="profileName"
                   type="text"
                   value={profileForm.name}
                   onChange={(e) =>
@@ -393,76 +453,100 @@ function MyProfile() {
                       name: e.target.value,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-orange-primary"
+                  minLength={2}
+                  maxLength={100}
                   required
+                  disabled={profileLoading}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm">Email</label>
+                <label htmlFor="profileEmail" className="mb-1 block text-sm">
+                  Email
+                </label>
 
                 <input
+                  id="profileEmail"
                   type="email"
                   value={profileForm.email}
                   readOnly
-                  className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-white"
+                  className="w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm dark:bg-zinc-800"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm">Location</label>
+                <label htmlFor="profileLocation" className="mb-1 block text-sm">
+                  Location
+                </label>
 
                 <input
+                  id="profileLocation"
                   type="text"
                   value={profileForm.location}
+                  maxLength={150}
+                  disabled={profileLoading}
                   onChange={(e) =>
                     setProfileForm((prev) => ({
                       ...prev,
                       location: e.target.value,
                     }))
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-orange-primary"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-sm">Bio</label>
+                <label htmlFor="profileBio" className="mb-1 block text-sm">
+                  Bio
+                </label>
 
                 <textarea
+                  id="profileBio"
                   value={profileForm.bio}
+                  maxLength={500}
+                  rows={4}
+                  disabled={profileLoading}
                   onChange={(e) =>
                     setProfileForm((prev) => ({
                       ...prev,
                       bio: e.target.value,
                     }))
                   }
-                  rows="4"
                   placeholder="Tell the community a little about yourself..."
-                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-orange-primary"
+                  className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 />
               </div>
+
+              {(previewError || profileError) && (
+                <p role="alert" className="text-sm text-red-500">
+                  {previewError || profileError}
+                </p>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowEditProfile(false)}
-                className="rounded-lg bg-gray-100 px-4 py-2 text-sm dark:border-white dark:bg-zinc-900 dark:text-white"
+                onClick={handleCloseEditProfile}
+                disabled={profileLoading}
+                className="rounded-lg bg-gray-100 px-4 py-2 text-sm text-gray-700 disabled:opacity-50 dark:bg-zinc-800 dark:text-white"
               >
                 Cancel
               </button>
 
               <button
                 type="submit"
-                className="rounded-lg bg-orange-primary px-4 py-2 text-sm text-white"
+                disabled={profileLoading}
+                className="rounded-lg bg-orange-primary px-4 py-2 text-sm text-white disabled:opacity-50"
               >
-                Save Changes
+                {profileLoading ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </form>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
