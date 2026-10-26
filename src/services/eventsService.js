@@ -1,23 +1,17 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
-// Get Events
 export async function getEvents(search = "", format = "") {
   const params = new URLSearchParams();
 
-  if (search) {
-    params.append("search", search);
-  }
-
-  if (format) {
-    params.append("format", format);
-  }
+  if (search) params.set("search", search);
+  if (format) params.set("format", format);
 
   const url = params.toString()
     ? `${API_URL}/api/events?${params.toString()}`
     : `${API_URL}/api/events`;
 
   const response = await fetch(url);
-  const result = await response.json();
+  const result = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     throw new Error(result.message || "Failed to get events");
@@ -26,7 +20,35 @@ export async function getEvents(search = "", format = "") {
   return result;
 }
 
-// Create Event multipart/form-data
+export async function getPaginatedEvents(
+  { page = 1, limit = 6, search = "", format = "", category = "" },
+  signal,
+) {
+  const params = new URLSearchParams();
+
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+
+  if (search) params.set("search", search);
+  if (format) params.set("format", format);
+
+  if (category && category !== "All") {
+    params.set("category", category);
+  }
+
+  const response = await fetch(`${API_URL}/api/events?${params.toString()}`, {
+    signal,
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(result.message || "Failed to load events");
+  }
+
+  return result;
+}
+
 export async function createEvent(form, bannerFile) {
   const token = localStorage.getItem("token");
 
@@ -81,7 +103,6 @@ export async function createEvent(form, bannerFile) {
   return result;
 }
 
-//geteventsmy
 export async function getMyEvents(signal) {
   const token = localStorage.getItem("token");
 
@@ -116,9 +137,7 @@ export async function getMyEvents(signal) {
   const events = candidates.find(Array.isArray);
 
   if (!events) {
-    throw new Error(
-      "Format response GET /api/events/my not found , check your response API",
-    );
+    throw new Error("Format response GET /api/events/my not found");
   }
 
   return events;

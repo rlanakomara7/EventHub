@@ -1,97 +1,141 @@
-import { useOutletContext } from "react-router";
 import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
+
 import SearchBar from "../../components/SearchBar";
 import EventList from "../../components/EventList";
-import { getEvents } from "../../services/eventsService";
+
+import {
+  fetchEventPage,
+  selectEvents,
+  selectEventMetadata,
+  selectEventLoading,
+  selectEventError,
+} from "../../redux/slice/eventSlice";
+
+const PAGE_LIMIT = 6;
 
 function Event() {
   const { handleEventClick, handleJoin } = useOutletContext();
+  const dispatch = useDispatch();
 
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const events = useSelector(selectEvents);
+  const metadata = useSelector(selectEventMetadata);
+  const loading = useSelector(selectEventLoading);
+  const error = useSelector(selectEventError);
 
-  // search filter
   const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [page, setPage] = useState(1);
 
-  // Ambil data dari localStorage lewat getEvents()
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, serError] = useState("");
-
-  //connect database
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        const result = await getEvents();
-        console.log("GET EVENTS:", result);
-        setEvents(result.data || []);
-      } catch (error) {
-        console.error(error.message);
-        serError(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchEvents();
-  }, []);
+    const request = dispatch(
+      fetchEventPage({
+        page,
+        limit: PAGE_LIMIT,
+        search,
+        category: selectedCategory,
+      }),
+    );
 
-  const eventsFiltered = events.filter((event) => {
-    const keyword = search.toLowerCase();
+    return () => request.abort();
+  }, [dispatch, page, search, selectedCategory]);
 
-    const matchSearch =
-      event.title?.toLowerCase().includes(keyword) ||
-      event.location?.toLowerCase().includes(keyword) ||
-      event.categories?.some((category) =>
-        category.toLowerCase().includes(keyword),
-      );
-
-    // CATEGORY
-    const matchCategory =
-      selectedCategory === "All" ||
-      event.categories?.includes(selectedCategory);
-
-    // harus lolos search & category
-    return matchSearch && matchCategory;
-  });
-
-  //handle loading and error
-  if (loading) {
-    return <div className="py-10 text-center">Loading Events...</div>;
+  function handleSearch(value) {
+    setSearch(value);
+    setPage(1);
   }
 
-  if (error) {
-    return <div className="py-10 text-center">{error}</div>;
+  function handleCategoryChange(value) {
+    setSelectedCategory(value);
+    setPage(1);
   }
+
+  const totalPage = metadata.total_page || 0;
+  const currentPage = metadata.current_page || page;
+
   return (
     <>
       <SearchBar
         search={search}
-        setSearch={setSearch}
+        setSearch={handleSearch}
         selectedCategory={selectedCategory}
-        setSelectedCategory={setSelectedCategory}
+        setSelectedCategory={handleCategoryChange}
       />
-      <div className="px-14">
+
+      <div className="px-4 md:px-10 lg:px-14">
         <div className="px-1 py-5">
-          <p className="font-bold text-lg">
-            {eventsFiltered.length}{" "}
-            <span className="text-gray-primary/40 font-medium">
-              {" "}
-              events found{" "}
+          <p className="text-lg font-bold">
+            {metadata.total_data}{" "}
+            <span className="font-medium text-gray-primary/40">
+              events found
             </span>
           </p>
         </div>
-        <EventList
-          events={eventsFiltered}
-          onAuthRequired={handleJoin}
-          onEventClick={handleEventClick}
-        />
-        <div className="flex justify-center mt-6 mb-6">
-          <button
-            type="button"
-            className="rounded-xl border border-gray-secondary/40 px-6 py-2 text-slate-600 font-semibold"
-          >
-            Load more events
-          </button>
-        </div>
+
+        {error && (
+          <div role="alert" className="py-6 text-center text-red-500">
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() =>
+                dispatch(
+                  fetchEventPage({
+                    page,
+                    limit: PAGE_LIMIT,
+                    search,
+                    category: selectedCategory,
+                  }),
+                )
+              }
+              className="mt-3 rounded-lg bg-orange-primary px-4 py-2 text-white"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {loading && (
+          <p className="py-8 text-center text-gray-500">Loading Events...</p>
+        )}
+
+        {!loading && !error && events.length === 0 && (
+          <p className="py-10 text-center text-gray-500">No events found.</p>
+        )}
+
+        {!loading && !error && events.length > 0 && (
+          <EventList
+            events={events}
+            onAuthRequired={handleJoin}
+            onEventClick={handleEventClick}
+          />
+        )}
+
+        {!error && (
+          <div className="my-8 flex items-center justify-center gap-4">
+            <button
+              type="button"
+              disabled={loading || currentPage <= 1}
+              onClick={() => setPage((previous) => Math.max(1, previous - 1))}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:text-white"
+            >
+              Previous
+            </button>
+
+            <span className="text-sm dark:text-white">
+              Page {currentPage} of {totalPage}
+            </span>
+
+            <button
+              type="button"
+              disabled={loading || currentPage >= totalPage}
+              onClick={() => setPage((previous) => previous + 1)}
+              className="rounded-lg bg-orange-primary px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </>
   );
