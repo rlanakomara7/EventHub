@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router";
+import { useOutletContext, useSearchParams } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
 
 import SearchBar from "../../components/SearchBar";
@@ -7,26 +7,53 @@ import EventList from "../../components/EventList";
 
 import {
   fetchEventPage,
+  fetchEventCategories,
   selectEvents,
   selectEventMetadata,
   selectEventLoading,
   selectEventError,
+  selectEventCategories,
+  selectCategoriesLoading,
+  selectCategoriesError,
 } from "../../redux/slice/eventSlice";
 
 const PAGE_LIMIT = 6;
 
 function Event() {
   const { handleEventClick, handleJoin } = useOutletContext();
+
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
 
   const events = useSelector(selectEvents);
   const metadata = useSelector(selectEventMetadata);
   const loading = useSelector(selectEventLoading);
   const error = useSelector(selectEventError);
 
-  const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
+  const categories = useSelector(selectEventCategories);
+  const categoriesLoading = useSelector(selectCategoriesLoading);
+  const categoriesError = useSelector(selectCategoriesError);
+
   const [page, setPage] = useState(1);
+
+  const search = searchParams.get("search") || "";
+  const selectedCategory = searchParams.get("category") || "All";
+
+  function handleSearchChange(value) {
+    setPage(1);
+  }
+
+  function handleCategoryChange(value) {
+    setPage(1);
+  }
+
+  useEffect(() => {
+    const request = dispatch(fetchEventCategories());
+
+    return () => {
+      request.abort();
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     const request = dispatch(
@@ -38,29 +65,40 @@ function Event() {
       }),
     );
 
-    return () => request.abort();
+    return () => {
+      request.abort();
+    };
   }, [dispatch, page, search, selectedCategory]);
 
-  function handleSearch(value) {
-    setSearch(value);
-    setPage(1);
+  function retryCategories() {
+    dispatch(fetchEventCategories());
   }
 
-  function handleCategoryChange(value) {
-    setSelectedCategory(value);
-    setPage(1);
+  function retryEvents() {
+    dispatch(
+      fetchEventPage({
+        page,
+        limit: PAGE_LIMIT,
+        search,
+        category: selectedCategory,
+      }),
+    );
   }
 
-  const totalPage = metadata.total_page || 0;
   const currentPage = metadata.current_page || page;
+  const totalPage = metadata.total_page || 0;
 
   return (
     <>
       <SearchBar
         search={search}
-        setSearch={handleSearch}
+        setSearch={handleSearchChange}
         selectedCategory={selectedCategory}
         setSelectedCategory={handleCategoryChange}
+        categories={categories}
+        categoriesLoading={categoriesLoading}
+        categoriesError={categoriesError}
+        onRetryCategories={retryCategories}
       />
 
       <div className="px-4 md:px-10 lg:px-14">
@@ -73,30 +111,22 @@ function Event() {
           </p>
         </div>
 
-        {error && (
-          <div role="alert" className="py-6 text-center text-red-500">
-            <p>{error}</p>
+        {loading && (
+          <p className="py-8 text-center text-gray-500">Loading Events...</p>
+        )}
+
+        {!loading && error && (
+          <div role="alert" className="py-8 text-center">
+            <p className="text-red-500">{error}</p>
+
             <button
               type="button"
-              onClick={() =>
-                dispatch(
-                  fetchEventPage({
-                    page,
-                    limit: PAGE_LIMIT,
-                    search,
-                    category: selectedCategory,
-                  }),
-                )
-              }
+              onClick={retryEvents}
               className="mt-3 rounded-lg bg-orange-primary px-4 py-2 text-white"
             >
               Try Again
             </button>
           </div>
-        )}
-
-        {loading && (
-          <p className="py-8 text-center text-gray-500">Loading Events...</p>
         )}
 
         {!loading && !error && events.length === 0 && (
@@ -111,11 +141,11 @@ function Event() {
           />
         )}
 
-        {!error && (
+        {!loading && !error && (
           <div className="my-8 flex items-center justify-center gap-4">
             <button
               type="button"
-              disabled={loading || currentPage <= 1}
+              disabled={currentPage <= 1}
               onClick={() => setPage((previous) => Math.max(1, previous - 1))}
               className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40 dark:text-white"
             >
@@ -128,7 +158,7 @@ function Event() {
 
             <button
               type="button"
-              disabled={loading || currentPage >= totalPage}
+              disabled={currentPage >= totalPage}
               onClick={() => setPage((previous) => previous + 1)}
               className="rounded-lg bg-orange-primary px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
