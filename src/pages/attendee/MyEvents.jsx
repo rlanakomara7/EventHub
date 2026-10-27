@@ -1,84 +1,57 @@
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router";
+
 import EventCard from "../../components/EventCard";
 import MyEventsFilter from "../../components/MyEventsFilter";
-import { useNavigate } from "react-router";
-import { useState } from "react";
 
-function readStorage(key) {
-  try {
-    const data = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
+import {
+  fetchJoinedEvents,
+  selectJoinedEvents,
+  selectMemberLoading,
+  selectMemberError,
+} from "../../redux/slice/eventMemberSlice";
+
+function getEventId(event) {
+  return event.event_id ?? event.id;
 }
 
 function MyEvents() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  // tab awal adalah Upcoming
   const [activeTab, setActiveTab] = useState("upcoming");
 
-  // data Join dan Save dipisahkan
-  const [registeredEvents, setRegisteredEvents] = useState(() =>
-    readStorage("registeredEvents"),
-  );
+  const joinedEvents = useSelector(selectJoinedEvents) || [];
+  const loading = useSelector(selectMemberLoading);
+  const error = useSelector(selectMemberError);
 
-  const [savedEvents, setSavedEvents] = useState(() =>
-    readStorage("savedEvents"),
-  );
-
-  function handleEventClick(eventId) {
-    navigate(`/event/${eventId}`);
-  }
-
-  //  fungsi Join dan Unregister
-  function handleToggleRegistered(event) {
-    const alreadyRegistered = registeredEvents.some(
-      (item) => String(item.id) === String(event.id),
-    );
-
-    const updatedEvents = alreadyRegistered
-      ? registeredEvents.filter((item) => String(item.id) !== String(event.id))
-      : [...registeredEvents, event];
-
-    localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
-
-    setRegisteredEvents(updatedEvents);
-  }
-
-  // fungsi menghapus atau menambah Saved
-  function handleSavedChange(event, isSaved) {
-    const updatedEvents = isSaved
-      ? savedEvents.some((item) => String(item.id) === String(event.id))
-        ? savedEvents
-        : [...savedEvents, event]
-      : savedEvents.filter((item) => String(item.id) !== String(event.id));
-
-    localStorage.setItem("savedEvents", JSON.stringify(updatedEvents));
-
-    setSavedEvents(updatedEvents);
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  //  event terdaftar yang akan datang
-  const upcomingEvents = registeredEvents.filter((event) => {
-    const eventDate = new Date(event.date);
-    eventDate.setHours(0, 0, 0, 0);
-
-    return eventDate >= today;
+  const [savedEvents, setSavedEvents] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("savedEvents") || "[]");
+    } catch {
+      return [];
+    }
   });
 
-  // event terdaftar yang sudah lewat
-  const pastEvents = registeredEvents.filter((event) => {
-    const eventDate = new Date(event.date);
-    eventDate.setHours(0, 0, 0, 0);
+  const now = new Date();
 
-    return eventDate < today;
+  const today = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+
+  const upcomingEvents = joinedEvents.filter((event) => {
+    const date = String(event.event_date || event.date || "").slice(0, 10);
+    return date && date >= today;
   });
 
-  // menentukan card sesuai tab aktif
+  const pastEvents = joinedEvents.filter((event) => {
+    const date = String(event.event_date || event.date || "").slice(0, 10);
+    return date && date < today;
+  });
+
   const visibleEvents =
     activeTab === "upcoming"
       ? upcomingEvents
@@ -86,14 +59,26 @@ function MyEvents() {
         ? pastEvents
         : savedEvents;
 
+  function handleSavedChange(event, isSaved) {
+    const updated = savedEvents.filter(
+      (item) => String(getEventId(item)) !== String(getEventId(event)),
+    );
+
+    if (isSaved) {
+      updated.push(event);
+    }
+
+    setSavedEvents(updated);
+    localStorage.setItem("savedEvents", JSON.stringify(updated));
+  }
+
   return (
     <>
-      <div className="mx-auto max-w-6xl px-6 mt-7">
+      <div className="mx-auto mt-7 max-w-6xl px-6">
         <h1 className="text-3xl font-bold text-black-primary dark:text-white">
           My Events
         </h1>
 
-        {/*kirim jumlah ke tab */}
         <MyEventsFilter
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -105,30 +90,40 @@ function MyEvents() {
         />
       </div>
 
-      <section className="min-h-screen bg-white-secondary py-6 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+      <section className="min-h-screen bg-white-secondary py-6 dark:bg-zinc-900">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {visibleEvents.length > 0 ? (
-              visibleEvents.map((event) => (
+          {loading && activeTab !== "saved" ? (
+            <p>Loading events...</p>
+          ) : error && activeTab !== "saved" ? (
+            <div>
+              <p className="text-red-600">{error}</p>
+
+              <button
+                type="button"
+                onClick={() => dispatch(fetchJoinedEvents())}
+                className="mt-2 text-orange-primary underline"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : visibleEvents.length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {visibleEvents.map((event) => (
                 <EventCard
-                  key={event.id}
+                  key={getEventId(event)}
                   event={event}
-                  isRegistered={registeredEvents.some(
-                    (item) => String(item.id) === String(event.id),
-                  )}
-                  onEventClick={handleEventClick}
-                  // Join atau Registered
-                  onAuthRequired={() => handleToggleRegistered(event)}
-                  // Save atau Unsave
+                  onEventClick={(id) => navigate(`/event/${id}`)}
                   onSavedChange={handleSavedChange}
                 />
-              ))
-            ) : (
-              <p className="text-sm text-gray-secondary">
-                No saved events. Bookmark to find them later.
-              </p>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-secondary">
+              {activeTab === "saved"
+                ? "No saved events yet."
+                : "No events found."}
+            </p>
+          )}
         </div>
       </section>
     </>

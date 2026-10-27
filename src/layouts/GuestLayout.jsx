@@ -1,48 +1,30 @@
 import { Outlet, useNavigate } from "react-router";
-import { useState } from "react";
-import { useSelector } from "react-redux";
-import { selectUser } from "../redux/slice/authSlice";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 
-//component
+import { selectUser } from "../redux/slice/authSlice";
+import { fetchJoinedEvents } from "../redux/slice/eventMemberSlice";
+
 import Header from "../components/Header";
 import ModalSign from "../components/ModalSign";
 
 function GuestLayout() {
-  const [showModal, setShowModal] = useState(false);
-
-  const currentUser = useSelector(selectUser);
-
+  const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  function handleGlobalJoin(event) {
-    // Belum login
-    if (!currentUser) {
-      setShowModal(true);
-      return;
-    }
+  const currentUser = useSelector(selectUser);
+  const [showModal, setShowModal] = useState(false);
 
-    //data localStorage
-    const registeredEvents =
-      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+  useEffect(() => {
+    if (!currentUser) return;
 
-    // Cek event
-    const alreadyRegistered = registeredEvents.some(
-      (item) => String(item.event_id) === String(event.event_id),
-    );
+    const request = dispatch(fetchJoinedEvents());
 
-    if (alreadyRegistered) {
-      // UNREGISTER
-      const updatedEvents = registeredEvents.filter(
-        (item) => String(item.event_id) !== String(event.event_id),
-      );
+    return () => request.abort();
+  }, [dispatch, currentUser]);
 
-      localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
-    } else {
-      // REGISTER
-      const updatedEvents = [...registeredEvents, event];
-
-      localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
-    }
+  function handleGlobalJoin() {
+    setShowModal(true);
   }
 
   function handleEventClick(eventId) {
@@ -50,12 +32,14 @@ function GuestLayout() {
       setShowModal(true);
       return;
     }
+
     navigate(`/event/${eventId}`);
   }
 
   return (
     <div className="min-h-screen bg-white text-black-primary transition-colors duration-300 dark:bg-zinc-950 dark:text-zinc-100">
       <Header />
+
       <main>
         <Outlet
           context={{
@@ -65,6 +49,7 @@ function GuestLayout() {
           }}
         />
       </main>
+
       {showModal && <ModalSign onClose={() => setShowModal(false)} />}
     </div>
   );

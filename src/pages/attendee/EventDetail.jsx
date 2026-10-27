@@ -7,11 +7,15 @@ import {
   FiMessageCircle,
 } from "react-icons/fi";
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
-
+import { useDispatch, useSelector } from "react-redux";
 import { selectUser } from "../../redux/slice/authSlice";
-
-// Tidak lagi menggunakan events.json
+import {
+  joinEvent,
+  leaveEvent,
+  fetchJoinedEvents,
+  selectJoinedIds,
+  selectMemberLoading,
+} from "../../redux/slice/eventMemberSlice";
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -49,6 +53,14 @@ function formatDate(value) {
 function EventDetail() {
   const { id } = useParams();
   const user = useSelector(selectUser);
+  const dispatch = useDispatch();
+
+  const joinedIds = useSelector(selectJoinedIds);
+  const memberLoading = useSelector(selectMemberLoading);
+
+  const registered = joinedIds.some(
+    (joinedId) => String(joinedId) === String(id),
+  );
 
   //  Data Event Detail dari PostgreSQL
   const [event, setEvent] = useState(null);
@@ -57,10 +69,8 @@ function EventDetail() {
   const [imageFailed, setImageFailed] = useState(false);
 
   //  State pendaftaran melalui backend
-  const [registered, setRegistered] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
-
   const [shareMessage, setShareMessage] = useState("");
 
   //  GET /api/events/:id
@@ -72,7 +82,6 @@ function EventDetail() {
       setError("");
       setImageFailed(false);
       setRegisterError("");
-      setRegistered(false);
       setEvent(null);
 
       try {
@@ -100,9 +109,6 @@ function EventDetail() {
         if (controller.signal.aborted) return;
 
         setEvent(data);
-
-        // Jika suatu saat backend menyertakan status pendaftaran
-        setRegistered(data.is_registered === true || data.is_joined === true);
       } catch (err) {
         if (!controller.signal.aborted) {
           setError(err.message || "Failed to load event.");
@@ -119,7 +125,6 @@ function EventDetail() {
     return () => controller.abort();
   }, [id]);
 
-  // Registrasi event melalui backend
   async function handleRegister() {
     if (!event || registering) return;
 
@@ -134,54 +139,36 @@ function EventDetail() {
     setRegistering(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/events/${event.event_id}/${
-          registered ? "leave" : "join"
-        }`,
-        {
-          method: registered ? "DELETE" : "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        const message =
-          result.message ||
-          (registered ? "Failed to leave event." : "Failed to join event.");
-
-        // Respons backend ketika user ternyata sudah terdaftar
-        if (
-          !registered &&
-          /already.*(join|register|member)|already registered/i.test(message)
-        ) {
-          setRegistered(true);
-          return;
-        }
-
-        throw new Error(message);
+      if (registered) {
+        await dispatch(leaveEvent(event.event_id)).unwrap();
+      } else {
+        await dispatch(joinEvent(event.event_id)).unwrap();
       }
 
-      setRegistered((previous) => !previous);
-
-      // Update angka peserta
       setEvent((previous) => {
         if (!previous) return previous;
 
-        const count = Number(previous.registered ?? 0);
-        const nextCount = registered ? Math.max(0, count - 1) : count + 1;
+        const count = Number(
+          previous.attendee_count ?? previous.registered ?? 0,
+        );
+
+        const newCount = Math.max(0, count + (registered ? -1 : 1));
 
         return {
           ...previous,
-          registered: nextCount,
-          spots_left: Math.max(0, Number(previous.capacity ?? 0) - nextCount),
+          attendee_count: newCount,
+          registered: newCount,
+          spots_left: Math.max(0, Number(previous.capacity ?? 0) - newCount),
         };
       });
-    } catch (err) {
-      setRegisterError(err.message || "Failed to update registration.");
+    } catch (error) {
+      setRegisterError(
+        typeof error === "string"
+          ? error
+          : error.message || "Failed to update registration.",
+      );
+
+      dispatch(fetchJoinedEvents());
     } finally {
       setRegistering(false);
     }
@@ -226,7 +213,7 @@ function EventDetail() {
   }
 
   // API Event Detail
-  const attendees = Number(event.registered ?? 0);
+  const attendees = Number(event.attendee_count ?? event.registered ?? 0);
   const capacity = Number(event.capacity ?? 0);
 
   const percentage =
@@ -476,21 +463,25 @@ function EventDetail() {
                 type="button"
                 onClick={handleRegister}
                 disabled={
-                  registering || (!registered && (isFull || isCompleted))
+                  registering ||
+                  memberLoading ||
+                  (!registered && (isFull || isCompleted))
                 }
                 className={`mt-4 w-full rounded-lg py-2.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
                   registered ? "bg-green-primary" : "bg-orange-primary"
                 }`}
               >
-                {registering
-                  ? "Processing..."
-                  : registered
-                    ? "Leave Event"
-                    : isCompleted
-                      ? "Event Completed"
-                      : isFull
-                        ? "Event Full"
-                        : "Join Event"}
+                {memberLoading
+                  ? "Checking..."
+                  : registering
+                    ? "Processing..."
+                    : registered
+                      ? "Leave Event"
+                      : isCompleted
+                        ? "Event Completed"
+                        : isFull
+                          ? "Event Full"
+                          : "Join Event"}
               </button>
 
               {registerError && (

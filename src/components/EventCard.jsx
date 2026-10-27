@@ -1,10 +1,23 @@
+import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+
 import { FiCalendar } from "react-icons/fi";
 import { FaBookmark } from "react-icons/fa";
 import { MdPeopleAlt } from "react-icons/md";
 import { FaLocationPin } from "react-icons/fa6";
-import { useState } from "react";
 
-const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+import {
+  joinEvent,
+  leaveEvent,
+  fetchJoinedEvents,
+  selectJoinedIds,
+  selectMemberLoaded,
+  selectMemberLoading,
+  selectMemberError,
+  selectMemberActionLoadingId,
+} from "../redux/slice/eventMemberSlice";
+
+const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 function resolveImageUrl(path) {
   if (!path) return "";
@@ -30,35 +43,31 @@ function EventCard({
   onAuthRequired = () => {},
   onEventClick = () => {},
   onSavedChange = () => {},
-  isRegistered = false,
 }) {
+  const dispatch = useDispatch();
+
   const eventId = event.event_id ?? event.id;
+  const token = localStorage.getItem("token");
 
-  const [registered, setRegistered] = useState(() => {
-    const registeredEvents = readStoredEvents("registeredEvents");
+  const joinedIds = useSelector(selectJoinedIds);
+  const memberLoaded = useSelector(selectMemberLoaded);
+  const memberLoading = useSelector(selectMemberLoading);
+  const memberError = useSelector(selectMemberError);
+  const actionLoadingId = useSelector(selectMemberActionLoadingId);
 
-    return (
-      isRegistered ||
-      registeredEvents.some(
-        (item) => String(item.event_id ?? item.id) === String(eventId),
-      )
-    );
-  });
+  const registered = joinedIds.includes(String(eventId));
+  const registering = actionLoadingId === String(eventId);
 
   const [saved, setSaved] = useState(() => {
-    const savedEvents = readStoredEvents("savedEvents");
-
-    return savedEvents.some(
+    return readStoredEvents("savedEvents").some(
       (item) => String(item.event_id ?? item.id) === String(eventId),
     );
   });
 
-  const [registering, setRegistering] = useState(false);
   const [actionError, setActionError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
   const [attendeeDelta, setAttendeeDelta] = useState(0);
 
-  //Gunakan field attendee_count dari PostgreSQL
   const initialAttendees = Number(event.attendee_count ?? event.attendees ?? 0);
 
   const attendees = Math.max(
@@ -71,6 +80,8 @@ function EventCard({
   const percentage =
     capacity > 0 ? Math.min(100, Math.round((attendees / capacity) * 100)) : 0;
 
+  const isFull = capacity > 0 && attendees >= capacity;
+
   const bannerUrl = resolveImageUrl(event.banner_url || event.image);
 
   const date = String(event.event_date || event.date || "").slice(0, 10);
@@ -81,7 +92,6 @@ function EventCard({
 
   const categories = Array.isArray(event.categories) ? event.categories : [];
 
-  // Bookmark, mempertahankan perilaku lama
   function handleSave(e) {
     e.stopPropagation();
 
@@ -100,86 +110,47 @@ function EventCard({
     try {
       localStorage.setItem("savedEvents", JSON.stringify(updatedEvents));
 
-      const nextSaved = !alreadySaved;
-      setSaved(nextSaved);
-      onSavedChange(event, nextSaved);
+      setSaved(!alreadySaved);
+      onSavedChange(event, !alreadySaved);
+      setActionError("");
     } catch {
-      setActionError("Failed to save event in this browser.");
+      setActionError("Failed to save event.");
     }
   }
 
-  //Join / Leave menggunakan API backend
   async function handleJoin(e) {
     e.stopPropagation();
 
-    if (eventId == null || registering) return;
-
-    const token = localStorage.getItem("token");
+    if (eventId == null || actionLoadingId !== null) return;
 
     if (!token) {
       onAuthRequired(event);
       return;
     }
 
-    const wasRegistered = registered;
+    if (!memberLoaded) return;
 
     setActionError("");
-    setRegistering(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/events/${eventId}/${wasRegistered ? "leave" : "join"}`,
-        {
-          method: wasRegistered ? "DELETE" : "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            (wasRegistered
-              ? "Failed to leave event."
-              : "Failed to join event."),
-        );
-      }
-
-      // Status berubah setelah backend sukses
-      const nextRegistered = !wasRegistered;
-
-      setRegistered(nextRegistered);
-
-      setAttendeeDelta((previous) => previous + (nextRegistered ? 1 : -1));
-
-      // Simpan status sementara untuk kompatibilitas
-      // dengan komponen lama yang memakai localStorage.
-      try {
-        const stored = readStoredEvents("registeredEvents");
-
-        const filtered = stored.filter(
-          (item) => String(item.event_id ?? item.id) !== String(eventId),
-        );
-
-        localStorage.setItem(
-          "registeredEvents",
-          JSON.stringify(nextRegistered ? [...filtered, event] : filtered),
-        );
-      } catch {
-        // Backend sudah berhasil, tidak perlu menggagalkan UI.
+      if (registered) {
+        await dispatch(leaveEvent(eventId)).unwrap();
+        setAttendeeDelta((previous) => previous - 1);
+      } else {
+        await dispatch(joinEvent(eventId)).unwrap();
+        setAttendeeDelta((previous) => previous + 1);
       }
     } catch (error) {
-      setActionError(error.message || "Failed to update registration.");
-    } finally {
-      setRegistering(false);
+      setActionError(
+        typeof error === "string"
+          ? error
+          : error?.message || "Failed to update registration.",
+      );
     }
   }
 
   return (
-    <article className="flex h-full min-w-0 w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+    <article className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
       <button
         type="button"
         onClick={() => onEventClick(eventId)}
@@ -207,13 +178,12 @@ function EventCard({
             <button
               type="button"
               onClick={() => onEventClick(eventId)}
-              className="line-clamp-2 w-full break-words text-left hover:text-orange-primary"
+              className="line-clamp-2 w-full wrap-break-word text-left hover:text-orange-primary"
             >
               {event.title}
             </button>
           </h3>
 
-          {/* CATEGORY */}
           <div className="flex min-h-6 flex-wrap gap-1.5">
             {categories.map((category, index) => {
               const categoryName =
@@ -234,7 +204,6 @@ function EventCard({
             })}
           </div>
 
-          {/* DATE */}
           <div className="flex min-w-0 items-start gap-2 text-sm text-gray-secondary">
             <FiCalendar className="mt-0.5 shrink-0" />
 
@@ -244,17 +213,16 @@ function EventCard({
             </p>
           </div>
 
-          {/* LOCATION */}
           <div className="flex min-w-0 items-start gap-2 text-sm text-gray-secondary">
             <FaLocationPin className="mt-0.5 shrink-0" />
 
-            <p className="min-w-0 break-words">{event.location || "-"}</p>
+            <p className="min-w-0 break-words">
+              {event.location || (event.format === "online" ? "Online" : "-")}
+            </p>
           </div>
 
-          {/* ATTENDEES */}
           <div className="flex items-center gap-2 text-sm text-gray-secondary">
             <MdPeopleAlt className="shrink-0" />
-
             <p>{percentage}% attendees</p>
           </div>
         </div>
@@ -265,7 +233,6 @@ function EventCard({
             <p>{capacity} capacity</p>
           </div>
 
-          {/* PROGRESS BAR */}
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               className="h-full rounded-full bg-green-primary transition-all"
@@ -279,14 +246,28 @@ function EventCard({
             </p>
           )}
 
+          {token && !memberLoaded && memberError && (
+            <div className="mt-3 text-xs text-red-600">
+              <p>{memberError}</p>
+              <button
+                type="button"
+                onClick={() => dispatch(fetchJoinedEvents())}
+                className="mt-1 underline"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
           <div className="mt-4 flex w-full items-center gap-2">
             <button
               type="button"
               onClick={handleJoin}
               disabled={
-                registering ||
                 eventId == null ||
-                (!registered && capacity > 0 && attendees >= capacity)
+                actionLoadingId !== null ||
+                (Boolean(token) && (!memberLoaded || memberLoading)) ||
+                (!registered && isFull)
               }
               className={`flex h-9 min-w-0 flex-1 items-center justify-center rounded-lg px-3 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${
                 registered ? "bg-green-primary" : "bg-orange-primary"
@@ -296,9 +277,11 @@ function EventCard({
                 ? "Processing..."
                 : registered
                   ? "Leave Event"
-                  : capacity > 0 && attendees >= capacity
-                    ? "Event Full"
-                    : "Join Event"}
+                  : token && !memberLoaded
+                    ? "Checking..."
+                    : isFull
+                      ? "Event Full"
+                      : "Join Event"}
             </button>
 
             <button
