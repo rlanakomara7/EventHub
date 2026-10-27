@@ -12,6 +12,5 @@ export async function getEventCategoriesAPI(signal) {
   if (!Array.isArray(result.data)) {
     throw new Error("Invalid categories response");
   }
-
   return result.data;
 }

@@ -136,51 +136,57 @@ function EventForm({ mode = "create" }) {
       });
 
     let detailRequest;
+    let active = true;
 
     if (isEdit && id) {
       detailRequest = dispatch(fetchEventDetail(id));
+
+      detailRequest
+        .unwrap()
+        .then((data) => {
+          if (!active) return;
+
+          const firstCategory = data.categories?.[0];
+
+          const categoryName =
+            typeof firstCategory === "string"
+              ? firstCategory
+              : firstCategory?.category_name || "";
+
+          const speakers = (data.speakers || [])
+            .map((speaker) =>
+              typeof speaker === "string" ? speaker : speaker.name,
+            )
+            .filter(Boolean);
+
+          const communityID =
+            data.community?.community_id ?? data.community_id ?? "";
+
+          setForm({
+            title: data.title || "",
+            description: data.description || "",
+            category: categoryName,
+            community: communityID ? String(communityID) : "",
+            image: getImageUrl(data.banner_url),
+            date: String(data.event_date || "").slice(0, 10),
+            time: String(data.start_time || "").slice(0, 5),
+            endTime: String(data.end_time || "").slice(0, 5),
+            eventFormat: data.format === "online" ? "online" : "in-person",
+            location: data.location || "",
+            capacity: data.capacity ?? 100,
+            speakers,
+          });
+        })
+        .catch(() => {});
     }
 
     return () => {
+      active = false;
       categoryRequest.abort();
       communityController.abort();
       detailRequest?.abort();
     };
   }, [dispatch, isEdit, id]);
-
-  useEffect(() => {
-    if (!isEdit || !detail || String(detail.event_id) !== String(id)) {
-      return;
-    }
-
-    const firstCategory = detail.categories?.[0];
-    const categoryName =
-      typeof firstCategory === "string"
-        ? firstCategory
-        : firstCategory?.category_name || "";
-
-    const speakers = (detail.speakers || [])
-      .map((speaker) => (typeof speaker === "string" ? speaker : speaker.name))
-      .filter(Boolean);
-
-    const communityID =
-      detail.community?.community_id ?? detail.community_id ?? "";
-
-    setForm({
-      title: detail.title || "",
-      description: detail.description || "",
-      category: categoryName,
-      community: communityID ? String(communityID) : "",
-      image: getImageUrl(detail.banner_url),
-      date: String(detail.event_date || "").slice(0, 10),
-      time: String(detail.start_time || "").slice(0, 5),
-      endTime: String(detail.end_time || "").slice(0, 5),
-      eventFormat: detail.format === "online" ? "online" : "in-person",
-      location: detail.location || "",
-      capacity: detail.capacity ?? 100,
-      speakers,
-    });
-  }, [isEdit, detail, id]);
 
   useEffect(() => {
     if (!saveSuccess) return;
