@@ -6,9 +6,8 @@ export async function getEvents(search = "", format = "") {
   if (search) params.set("search", search);
   if (format) params.set("format", format);
 
-  const url = params.toString()
-    ? `${API_URL}/api/events?${params.toString()}`
-    : `${API_URL}/api/events`;
+  const query = params.toString();
+  const url = `${API_URL}/api/events${query ? `?${query}` : ""}`;
 
   const response = await fetch(url);
   const result = await response.json().catch(() => ({}));
@@ -24,10 +23,10 @@ export async function getPaginatedEvents(
   { page = 1, limit = 6, search = "", format = "", category = "" },
   signal,
 ) {
-  const params = new URLSearchParams();
-
-  params.set("page", String(page));
-  params.set("limit", String(limit));
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
 
   if (search) params.set("search", search);
   if (format) params.set("format", format);
@@ -61,26 +60,26 @@ export async function createEvent(form, bannerFile) {
   formData.append("title", form.title.trim());
   formData.append("description", form.description || "");
   formData.append("category", form.category);
-
   formData.append("event_date", form.date);
   formData.append("start_time", form.time);
   formData.append("end_time", form.endTime);
-
   formData.append(
     "format",
     form.eventFormat === "in-person" ? "in_person" : "online",
   );
-
-  formData.append("location", form.location);
+  formData.append(
+    "location",
+    form.eventFormat === "online" ? "" : form.location.trim(),
+  );
   formData.append("capacity", String(form.capacity));
 
   if (form.community) {
     formData.append("community_id", String(form.community));
   }
 
-  form.speakers.forEach((speaker) => {
-    formData.append("speakers", speaker);
-  });
+  for (const speaker of form.speakers) {
+    formData.append("speakers", speaker.trim());
+  }
 
   if (bannerFile) {
     formData.append("banner", bannerFile);
@@ -137,7 +136,7 @@ export async function getMyEvents(signal) {
   const events = candidates.find(Array.isArray);
 
   if (!events) {
-    throw new Error("Format response GET /api/events/my not found");
+    throw new Error("Invalid GET /api/events/my response");
   }
 
   return events;

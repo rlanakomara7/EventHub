@@ -5,134 +5,270 @@ import {
   FiMapPin,
   FiUsers,
   FiMessageCircle,
-  FiSend,
 } from "react-icons/fi";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+
 import { selectUser } from "../../redux/slice/authSlice";
-import events from "../../data/events.json";
 
-function EventDetail() {
-  // id DARI URL
-  const { id } = useParams();
+// Tidak lagi menggunakan events.json
 
-  // CARI EVENT SESUAI ID
-  const event = events.find((event) => String(event.id) === String(id));
+const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
-  // komentar
-  const user = useSelector(selectUser);
+function resolveImageUrl(path) {
+  if (!path) return "";
 
-  const [comments, setComments] = useState(() => {
-    const savedComments = JSON.parse(
-      localStorage.getItem(`eventComments_${id}`),
-    );
-
-    return (
-      savedComments || [
-        {
-          id: 1,
-          author: "Dian Purnama",
-          text: "Super excited for this event!",
-          time: "2d ago",
-        },
-        {
-          id: 2,
-          author: "Ahmad Fauzan",
-          text: "Bring your laptop and get ready for the workshop.",
-          time: "1d ago",
-        },
-      ]
-    );
-  });
-  const [comment, setComment] = useState("");
-
-  function handleAddComment(e) {
-    e.preventDefault();
-
-    const trimmedComment = comment.trim();
-
-    if (!trimmedComment) return;
-
-    const newComment = {
-      id: Date.now(),
-      author: user?.name || "User",
-      text: trimmedComment,
-      time: "Just now",
-    };
-
-    const updatedComments = [...comments, newComment];
-
-    setComments(updatedComments);
-    setComment("");
-
-    localStorage.setItem(
-      `eventComments_${id}`,
-      JSON.stringify(updatedComments),
-    );
+  if (/^(https?:\/\/|data:)/i.test(path)) {
+    return path;
   }
 
-  // ------------
-  const [registered, setRegistered] = useState(() => {
-    const registeredEvents =
-      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+  return `${API_URL}/${String(path).replace(/^\/+/, "")}`;
+}
 
-    return registeredEvents.some((item) => String(item.id) === String(id));
+function formatDate(value) {
+  if (!value) return "-";
+
+  const date = String(value).slice(0, 10);
+  const parts = date.split("-");
+
+  if (parts.length !== 3) return date;
+
+  const parsed = new Date(`${date}T12:00:00`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
+}
 
-  function handleRegister() {
-    // Ambil data registered dari localStorage
-    const registeredEvents =
-      JSON.parse(localStorage.getItem("registeredEvents")) || [];
+function EventDetail() {
+  const { id } = useParams();
+  const user = useSelector(selectUser);
 
-    // Cek apakah event sudah ada
-    const alreadyRegistered = registeredEvents.some(
-      (item) => String(item.id) === String(event.id),
-    );
+  //  Data Event Detail dari PostgreSQL
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
 
-    if (alreadyRegistered) {
-      const updatedEvents = registeredEvents.filter(
-        (item) => String(item.id) !== String(event.id),
-      );
+  //  State pendaftaran melalui backend
+  const [registered, setRegistered] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState("");
 
-      localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
+  const [shareMessage, setShareMessage] = useState("");
 
-      // ubah tombol menjadi Join Event
+  //  GET /api/events/:id
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadEvent() {
+      setLoading(true);
+      setError("");
+      setImageFailed(false);
+      setRegisterError("");
       setRegistered(false);
+      setEvent(null);
 
+      try {
+        const response = await fetch(`${API_URL}/api/events/${id}`, {
+          signal: controller.signal,
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("Event not found.");
+          }
+
+          throw new Error(result.message || "Failed to load event.");
+        }
+
+        const data =
+          result.data?.event ?? result.data ?? result.event ?? result;
+
+        if (!data || !data.event_id) {
+          throw new Error("Invalid event detail response.");
+        }
+
+        if (controller.signal.aborted) return;
+
+        setEvent(data);
+
+        // Jika suatu saat backend menyertakan status pendaftaran
+        setRegistered(data.is_registered === true || data.is_joined === true);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err.message || "Failed to load event.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadEvent();
+
+    return () => controller.abort();
+  }, [id]);
+
+  // Registrasi event melalui backend
+  async function handleRegister() {
+    if (!event || registering) return;
+
+    const token = localStorage.getItem("token");
+
+    if (!user || !token) {
+      setRegisterError("Please login to join this event.");
       return;
     }
 
-    const updatedEvents = [...registeredEvents, event];
+    setRegisterError("");
+    setRegistering(true);
 
-    localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
+    try {
+      const response = await fetch(
+        `${API_URL}/api/events/${event.event_id}/${
+          registered ? "leave" : "join"
+        }`,
+        {
+          method: registered ? "DELETE" : "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-    // ubah tombol menjadi Registered
-    setRegistered(true);
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message =
+          result.message ||
+          (registered ? "Failed to leave event." : "Failed to join event.");
+
+        // Respons backend ketika user ternyata sudah terdaftar
+        if (
+          !registered &&
+          /already.*(join|register|member)|already registered/i.test(message)
+        ) {
+          setRegistered(true);
+          return;
+        }
+
+        throw new Error(message);
+      }
+
+      setRegistered((previous) => !previous);
+
+      // Update angka peserta
+      setEvent((previous) => {
+        if (!previous) return previous;
+
+        const count = Number(previous.registered ?? 0);
+        const nextCount = registered ? Math.max(0, count - 1) : count + 1;
+
+        return {
+          ...previous,
+          registered: nextCount,
+          spots_left: Math.max(0, Number(previous.capacity ?? 0) - nextCount),
+        };
+      });
+    } catch (err) {
+      setRegisterError(err.message || "Failed to update registration.");
+    } finally {
+      setRegistering(false);
+    }
   }
 
-  // JIKA EVENT TIDAK DITEMUKAN
-  if (!event) {
-    return (
-      <>
-        <div className="p-10">
-          <h1 className="text-2xl font-bold">Event not found</h1>
+  async function handleShare() {
+    const url = window.location.href;
 
-          <Link to="/event" className="mt-3 inline-block text-orange-primary">
-            ← Back to Events
-          </Link>
-        </div>
-      </>
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: event.title,
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShareMessage("Event link copied!");
+      }
+    } catch {
+      setShareMessage("Unable to share event link.");
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-6xl px-6 py-12">
+        <p className="text-gray-secondary">Loading event details...</p>
+      </main>
     );
   }
 
-  // HITUNG PERSENTASE ATTENDEES
-  const percentage = Math.round((event.attendees / event.capacity) * 100);
+  if (error || !event) {
+    return (
+      <main className="mx-auto max-w-6xl px-6 py-12">
+        <h1 className="text-2xl font-bold">{error || "Event not found"}</h1>
+
+        <Link to="/event" className="mt-3 inline-block text-orange-primary">
+          ← Back to Events
+        </Link>
+      </main>
+    );
+  }
+
+  // API Event Detail
+  const attendees = Number(event.registered ?? 0);
+  const capacity = Number(event.capacity ?? 0);
+
+  const percentage =
+    capacity > 0
+      ? Math.min(100, Math.max(0, Math.round((attendees / capacity) * 100)))
+      : 0;
+
+  const categories = Array.isArray(event.categories) ? event.categories : [];
+
+  const speakers = Array.isArray(event.speakers) ? event.speakers : [];
+
+  const discussions = Array.isArray(event.discussions) ? event.discussions : [];
+
+  const bannerUrl = resolveImageUrl(event.banner_url);
+
+  const isFull =
+    event.availability === "full" || (capacity > 0 && attendees >= capacity);
+
+  const isCompleted =
+    event.availability === "completed" || event.status === "completed";
+
+  const availabilityLabel = isCompleted
+    ? "Completed"
+    : isFull
+      ? "Full"
+      : "Available";
+
+  const formattedTime = [
+    String(event.start_time || "").slice(0, 5),
+    String(event.end_time || "").slice(0, 5),
+  ]
+    .filter(Boolean)
+    .join(" – ");
 
   return (
     <>
       {/* BACK */}
       <div className="border-b border-gray-200 px-4 py-4 md:px-10">
-        <Link to="/event" className="text-sm text-gray-secondary">
+        <Link
+          to="/event"
+          className="text-sm text-gray-secondary hover:text-orange-primary"
+        >
           ← Back to Events
         </Link>
       </div>
@@ -141,21 +277,47 @@ function EventDetail() {
       <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* LEFT CONTENT */}
-          <div className="lg:col-span-2">
-            <img
-              src={event.image}
-              alt={event.title}
-              className="h-56 w-full rounded-xl object-cover md:h-96"
-            />
+          <div className="min-w-0 lg:col-span-2">
+            {/*  URL backend */}
+            {bannerUrl && !imageFailed ? (
+              <img
+                src={bannerUrl}
+                alt={event.title}
+                onError={() => setImageFailed(true)}
+                className="h-56 w-full rounded-xl object-cover md:h-96"
+              />
+            ) : (
+              <div className="flex h-56 w-full items-center justify-center rounded-xl bg-gray-100 text-sm text-gray-400 md:h-96">
+                No event image
+              </div>
+            )}
 
             {/* CATEGORY */}
-            <div className="mt-4 flex gap-2">
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-500">
-                {event.category}
-              </span>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {categories.map((category, index) => {
+                const categoryName =
+                  typeof category === "string"
+                    ? category
+                    : category.category_name;
 
-              <span className="rounded-full bg-green-50 px-3 py-1 text-xs text-green-500">
-                Available
+                return (
+                  <span
+                    key={`${categoryName}-${index}`}
+                    className="rounded-full bg-blue-50 px-3 py-1 text-xs text-blue-500"
+                  >
+                    {categoryName}
+                  </span>
+                );
+              })}
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs ${
+                  isFull || isCompleted
+                    ? "bg-gray-100 text-gray-500"
+                    : "bg-green-50 text-green-600"
+                }`}
+              >
+                {availabilityLabel}
               </span>
             </div>
 
@@ -168,10 +330,8 @@ function EventDetail() {
             <section className="mt-6">
               <h2 className="font-semibold">About this event</h2>
 
-              <p className="mt-3 text-sm leading-6 text-gray-secondary">
-                Join this event and connect with people who share similar
-                interests. Learn new skills, exchange ideas, and participate in
-                an engaging community experience.
+              <p className="mt-3 whitespace-pre-line text-sm leading-6 text-gray-secondary">
+                {event.description || "No description provided."}
               </p>
             </section>
 
@@ -179,77 +339,86 @@ function EventDetail() {
             <section className="mt-7">
               <h2 className="font-semibold">Speakers</h2>
 
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="font-semibold">Ahmad Fauzan</p>
-                  <p className="text-xs text-gray-secondary">Staff Engineer</p>
-                </div>
+              {speakers.length > 0 ? (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {speakers.map((speaker, index) => (
+                    <div
+                      key={speaker.speaker_id ?? index}
+                      className="rounded-xl border border-gray-200 p-4"
+                    >
+                      <p className="font-semibold">
+                        {typeof speaker === "string" ? speaker : speaker.name}
+                      </p>
 
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <p className="font-semibold">Dina Rahayu</p>
-                  <p className="text-xs text-gray-secondary">Backend Lead</p>
+                      {speaker.job && (
+                        <p className="text-xs text-gray-secondary">
+                          {speaker.job}
+                        </p>
+                      )}
+
+                      {speaker.company && (
+                        <p className="text-xs text-gray-secondary">
+                          {speaker.company}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-secondary">
+                  No speakers announced yet.
+                </p>
+              )}
             </section>
 
             {/* DISCUSSION */}
             <section className="mt-7">
               <h2 className="flex items-center gap-2 font-semibold">
-                {" "}
                 <FiMessageCircle />
                 Discussion
                 <span className="text-sm font-normal text-gray-secondary">
-                  ({comments.length})
+                  ({discussions.length})
                 </span>
               </h2>
 
-              <div className="mt-3 space-y-3">
-                {comments.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl border border-gray-200 p-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">{item.author}</p>
+              {discussions.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  {discussions.map((item, index) => (
+                    <div
+                      key={item.discussion_id ?? index}
+                      className="rounded-xl border border-gray-200 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">
+                          {item.name || "User"}
+                        </p>
 
-                      <span className="text-xs text-gray-secondary">
-                        {item.time}
-                      </span>
+                        <span className="text-xs text-gray-secondary">
+                          {item.created_at || ""}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-sm text-gray-secondary">
+                        {item.message}
+                      </p>
                     </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-secondary">
+                  No discussions yet.
+                </p>
+              )}
 
-                    <p className="mt-1 text-sm text-gray-secondary">
-                      {item.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              {/* form diskusi */}
-              <form
-                onSubmit={handleAddComment}
-                className="mt-3 flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2"
-              >
-                <input
-                  type="text"
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Add to the discussion..."
-                  className="flex-1 bg-transparent text-sm outline-none"
-                />
-
-                <button
-                  type="submit"
-                  className="text-orange-primary"
-                  aria-label="Send comment"
-                >
-                  <FiSend />
-                </button>
-              </form>
+              <p className="mt-4 text-xs text-gray-secondary">
+                Posting discussions will be available after the discussion API
+                is connected.
+              </p>
             </section>
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <aside>
+          <aside className="min-w-0">
             <div className="rounded-xl border border-gray-200 p-5">
               <p className="text-xs font-semibold text-gray-secondary">
                 EVENT INFO
@@ -258,23 +427,29 @@ function EventDetail() {
               <div className="mt-4 space-y-3 text-sm text-gray-secondary">
                 <div className="flex items-center gap-2">
                   <FiCalendar />
-                  <span>{event.date}</span>
+                  <span>{formatDate(event.event_date)}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <FiClock />
-                  <span>{event.time}</span>
+                  <span>
+                    {formattedTime || "-"}
+                    {formattedTime && " WIB"}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <FiMapPin />
-                  <span>{event.location}</span>
+                  <span>
+                    {event.location || "-"}
+                    {event.format === "online" && " (Online)"}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <FiUsers />
                   <span>
-                    {event.attendees} / {event.capacity}
+                    {attendees} / {capacity}
                   </span>
                 </div>
               </div>
@@ -282,8 +457,8 @@ function EventDetail() {
               {/* CAPACITY */}
               <div className="mt-5">
                 <div className="flex justify-between text-xs text-gray-secondary">
-                  <span>{event.attendees} attendees</span>
-                  <span>{event.capacity} capacity</span>
+                  <span>{attendees} attendees</span>
+                  <span>{capacity} capacity</span>
                 </div>
 
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-200">
@@ -296,32 +471,59 @@ function EventDetail() {
                 </div>
               </div>
 
+              {/* Join/Leave via API */}
               <button
                 type="button"
                 onClick={handleRegister}
-                className={`mt-4 w-full rounded-lg py-2.5 text-sm text-white-primary ${
+                disabled={
+                  registering || (!registered && (isFull || isCompleted))
+                }
+                className={`mt-4 w-full rounded-lg py-2.5 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50 ${
                   registered ? "bg-green-primary" : "bg-orange-primary"
                 }`}
               >
-                {registered ? "Registered" : "Join Event"}
+                {registering
+                  ? "Processing..."
+                  : registered
+                    ? "Leave Event"
+                    : isCompleted
+                      ? "Event Completed"
+                      : isFull
+                        ? "Event Full"
+                        : "Join Event"}
               </button>
+
+              {registerError && (
+                <p role="alert" className="mt-3 text-xs text-red-600">
+                  {registerError}
+                </p>
+              )}
 
               {/* ACTION */}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  className="rounded-lg border border-gray-200 py-2 text-sm"
+                  disabled
+                  title="Save event API not connected yet"
+                  className="rounded-lg border border-gray-200 py-2 text-sm opacity-50"
                 >
                   Save
                 </button>
 
                 <button
                   type="button"
-                  className="rounded-lg border border-gray-200 py-2 text-sm"
+                  onClick={handleShare}
+                  className="rounded-lg border border-gray-200 py-2 text-sm hover:border-orange-primary"
                 >
                   Share
                 </button>
               </div>
+
+              {shareMessage && (
+                <p className="mt-2 text-xs text-gray-secondary">
+                  {shareMessage}
+                </p>
+              )}
             </div>
 
             {/* ORGANIZER */}
@@ -331,11 +533,15 @@ function EventDetail() {
               </p>
 
               <div className="mt-4">
-                <p className="font-semibold">Rizky Pratama</p>
-
-                <p className="text-xs text-orange-primary">
-                  EventHub Community
+                <p className="font-semibold">
+                  {event.organizer?.name || "Organizer"}
                 </p>
+
+                {event.community?.name && (
+                  <p className="text-xs text-orange-primary">
+                    {event.community.name}
+                  </p>
+                )}
               </div>
             </div>
           </aside>

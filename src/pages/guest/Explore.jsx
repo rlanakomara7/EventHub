@@ -1,44 +1,108 @@
-import EventList from "../../components/EventList";
-import events from "../../data/events.json";
-import communities from "../../data/communities.json";
-import reviews from "../../data/reviews.json";
-import Hero from "../../components/Hero";
-import CommunityList from "../../components/CommunityList";
-import ReviewList from "../../components/ReviewList";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { selectUser } from "../../redux/slice/authSlice";
-import { useOutletContext } from "react-router";
+import { useNavigate, useOutletContext } from "react-router";
+
+import EventList from "../../components/EventList";
+import CommunityList from "../../components/CommunityList";
+import Hero from "../../components/Hero";
 import Footer from "../../components/Footer";
 
+import { selectUser } from "../../redux/slice/authSlice";
+
+import {
+  getExploreEvents,
+  getExploreCommunities,
+} from "../../services/exploreService";
+
 function Explore() {
-  const { handleJoin, handleEventClick } = useOutletContext();
+  const context = useOutletContext();
+  const navigate = useNavigate();
+
+  const handleJoin = context?.handleJoin;
+  const handleEventClick = context?.handleEventClick;
 
   const user = useSelector(selectUser);
-
   const role = user?.role;
 
-  console.log("USER:", user);
-  console.log("ROLE:", role);
-
   const [search, setSearch] = useState("");
-
   const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const eventsFiltered = events.filter((event) => {
-    const keyword = search.toLowerCase();
+  const [events, setEvents] = useState([]);
+  const [communities, setCommunities] = useState([]);
 
-    const matchSearch =
-      event.title?.toLowerCase().includes(keyword) ||
-      event.category?.toLowerCase().includes(keyword) ||
-      event.location?.toLowerCase().includes(keyword);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [loadingCommunities, setLoadingCommunities] = useState(true);
 
-    // CATEGORY
-    const matchCategory =
-      selectedCategory === "All" || event.category === selectedCategory;
+  const [eventsError, setEventsError] = useState("");
+  const [communitiesError, setCommunitiesError] = useState("");
 
-    return matchSearch && matchCategory;
-  });
+  useEffect(() => {
+    let active = true;
+
+    getExploreEvents()
+      .then((data) => {
+        if (active) {
+          setEvents(data);
+          setEventsError("");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setEventsError(error.message);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoadingEvents(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    getExploreCommunities(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) {
+          setCommunities(data);
+          setCommunitiesError("");
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setCommunitiesError(error.message);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingCommunities(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  const eventsFiltered = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return events.filter((event) => {
+      const categories = event.categories || [];
+
+      const matchSearch =
+        event.title?.toLowerCase().includes(keyword) ||
+        event.location?.toLowerCase().includes(keyword) ||
+        categories.some((category) => category.toLowerCase().includes(keyword));
+
+      const matchCategory =
+        selectedCategory === "All" || categories.includes(selectedCategory);
+
+      return matchSearch && matchCategory;
+    });
+  }, [events, search, selectedCategory]);
 
   return (
     <>
@@ -48,54 +112,112 @@ function Explore() {
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
       />
-      <main className="mx-auto w-full px-14">
-        <div>
-          <div className="flex justify-between items-center">
+
+      <main className="mx-auto w-full px-5 md:px-14">
+        <section>
+          <div className="flex items-center justify-between gap-4">
             {role === "attendee" ? (
               <div className="mb-6">
-                <p className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase text-orange-primary">
-                  ↗ Recommended For You
+                <p className="mb-1 text-sm font-semibold uppercase text-orange-primary">
+                  ↗ Discover Your Next Event
                 </p>
                 <p className="text-lg font-bold md:text-2xl">
-                  Because you joined{" "}
-                  <span className="text-orange-primary">
-                    Bandung Go Community
-                  </span>
+                  Events you might be interested in
                 </p>
               </div>
             ) : (
-              <p className="px-1 text-lg font-bold md:text-2xl mb-4">
+              <h2 className="mb-4 px-1 text-lg font-bold md:text-2xl">
                 Discover events that interest you
+              </h2>
+            )}
+
+            <button
+              type="button"
+              onClick={() => navigate("/event")}
+              className="text-sm text-slate-400 hover:text-orange-primary"
+            >
+              See all →
+            </button>
+          </div>
+
+          {loadingEvents && (
+            <p className="py-8 text-center text-gray-secondary">
+              Loading events...
+            </p>
+          )}
+
+          {eventsError && !loadingEvents && (
+            <p role="alert" className="py-6 text-red-600">
+              {eventsError}
+            </p>
+          )}
+
+          {!loadingEvents && !eventsError && eventsFiltered.length === 0 && (
+            <p className="py-8 text-center text-gray-secondary">
+              No events found.
+            </p>
+          )}
+
+          {!loadingEvents && !eventsError && (
+            <EventList
+              events={eventsFiltered}
+              onAuthRequired={handleJoin}
+              onEventClick={(eventOrId) => {
+                const eventId =
+                  typeof eventOrId === "object"
+                    ? (eventOrId?.event_id ?? eventOrId?.id)
+                    : eventOrId;
+
+                if (eventId == null) return;
+
+                navigate(`/event/${eventId}`);
+              }}
+            />
+          )}
+        </section>
+
+        <section className="pt-17">
+          <div className="flex items-center justify-between">
+            <h2 className="px-1 text-2xl font-bold">Popular Communities</h2>
+
+            <button
+              type="button"
+              onClick={() => navigate("/communities")}
+              className="text-sm text-slate-400 hover:text-orange-primary"
+            >
+              See all →
+            </button>
+          </div>
+
+          {loadingCommunities && (
+            <p className="py-8 text-center text-gray-secondary">
+              Loading communities...
+            </p>
+          )}
+
+          {communitiesError && !loadingCommunities && (
+            <p role="alert" className="py-6 text-red-600">
+              {communitiesError}
+            </p>
+          )}
+
+          {!loadingCommunities &&
+            !communitiesError &&
+            communities.length === 0 && (
+              <p className="py-8 text-center text-gray-secondary">
+                No communities found.
               </p>
             )}
 
-            <button className="text-slate-400">See all → </button>
-          </div>
-
-          <EventList
-            events={eventsFiltered}
-            onAuthRequired={handleJoin}
-            onEventClick={handleEventClick}
-          />
-        </div>
-        <div className="pt-17">
-          <div className="flex justify-between items-center">
-            <p className="px-1 font-bold text-2xl ">Popular Communities</p>
-            <button className="text-slate-400">See all → </button>
-          </div>
-          <CommunityList
-            communities={communities}
-            onAuthRequired={handleJoin}
-            events={eventsFiltered}
-            onEventClick={handleEventClick}
-          />
-        </div>
-        <div className="pt-10  ">
-          <p className="px-1 mb-4 font-bold text-2xl">
-            What the community says
-          </p>
-          <ReviewList reviews={reviews} />
-        </div>
+          {!loadingCommunities && !communitiesError && (
+            <CommunityList
+              communities={communities}
+              onAuthRequired={handleJoin}
+              events={eventsFiltered}
+              onEventClick={handleEventClick}
+            />
+          )}
+        </section>
       </main>
       <Footer />
     </>

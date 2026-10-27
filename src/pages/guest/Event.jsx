@@ -39,11 +39,11 @@ function Event() {
   const search = searchParams.get("search") || "";
   const selectedCategory = searchParams.get("category") || "All";
 
-  function handleSearchChange(value) {
+  function handleSearchChange() {
     setPage(1);
   }
 
-  function handleCategoryChange(value) {
+  function handleCategoryChange() {
     setPage(1);
   }
 

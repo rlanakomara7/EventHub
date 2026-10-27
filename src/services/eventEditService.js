@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 export async function getEventDetail(eventId, signal) {
   const response = await fetch(`${API_URL}/api/events/${eventId}`, {
@@ -18,15 +18,10 @@ export async function getEventDetail(eventId, signal) {
     throw new Error("Invalid event detail response.");
   }
 
-  if (
-    !Array.isArray(event.categories) ||
-    event.categories.length !== 1 ||
-    !Array.isArray(event.speakers)
-  ) {
-    throw new Error(
-      "Event detail must contain one category and speakers array.",
-    );
+  if (!Array.isArray(event.categories) || !Array.isArray(event.speakers)) {
+    throw new Error("Invalid event categories or speakers.");
   }
+
   return event;
 }
 
@@ -49,19 +44,23 @@ export async function updateEvent(eventId, form, bannerFile) {
 
   formData.append(
     "format",
-    form.EventFormat == "in-person" ? "in_person" : "online",
+    form.eventFormat === "in-person" ? "in_person" : "online",
   );
 
-  formData.append("location", form.location);
+  formData.append(
+    "location",
+    form.eventFormat === "online" ? "" : form.location.trim(),
+  );
+
   formData.append("capacity", String(form.capacity));
 
   if (form.community) {
     formData.append("community_id", String(form.community));
   }
 
-  form.speakers.forEach((speaker) => {
+  for (const speaker of form.speakers) {
     formData.append("speakers", speaker.trim());
-  });
+  }
 
   if (bannerFile) {
     formData.append("banner", bannerFile);

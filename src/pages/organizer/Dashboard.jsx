@@ -40,7 +40,7 @@ function getBannerUrl(event) {
   }
 
   const baseUrl = (
-    import.meta.env.VITE_API_URL || "http://localhost:8500"
+    import.meta.env.VITE_API_URL ?? "http://localhost:8500"
   ).replace(/\/$/, "");
 
   return banner.startsWith("/")

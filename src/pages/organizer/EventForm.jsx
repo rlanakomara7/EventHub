@@ -1,10 +1,25 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
-import { createEvent } from "../../services/eventsService";
-import { getEventDetail, updateEvent } from "../../services/eventEditService";
 import { getCommunities } from "../../services/communityService";
+
+import {
+  fetchEventCategories,
+  fetchEventDetail,
+  createNewEvent,
+  updateExistingEvent,
+  resetEventFormStatus,
+  selectEventCategories,
+  selectCategoriesLoading,
+  selectCategoriesError,
+  selectEventDetail,
+  selectEventDetailLoading,
+  selectEventDetailError,
+  selectEventSaving,
+  selectEventSaveError,
+  selectEventSaveSuccess,
+} from "../../redux/slice/eventSlice";
 
 const emptyForm = {
   title: "",
@@ -21,115 +36,158 @@ const emptyForm = {
   speakers: [],
 };
 
+function getLocalToday() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 function getImageUrl(path) {
   if (!path) return "";
 
-  if (
-    path.startsWith("http://") ||
-    path.startsWith("https://") ||
-    path.startsWith("data:")
-  ) {
+  if (/^(https?:\/\/|data:|blob:)/i.test(path)) {
     return path;
   }
 
-  const baseUrl = (
-    import.meta.env.VITE_API_URL || "http://localhost:8500"
-  ).replace(/\/$/, "");
+  const baseURL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  return `${baseURL}/${path.replace(/^\/+/, "")}`;
+}
 
-  return path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+function validateSchedule(form) {
+  if (!form.date || !form.time || !form.endTime) {
+    return "Please complete the event date and time.";
+  }
+
+  const date = new Date(`${form.date}T00:00:00`);
+
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== Number(form.date.slice(0, 4)) ||
+    date.getMonth() + 1 !== Number(form.date.slice(5, 7)) ||
+    date.getDate() !== Number(form.date.slice(8, 10))
+  ) {
+    return "Invalid event date.";
+  }
+
+  if (form.date < getLocalToday()) {
+    return "Event date cannot be in the past.";
+  }
+
+  if (form.endTime <= form.time) {
+    return "End time must be after start time.";
+  }
+
+  if (
+    form.date === getLocalToday() &&
+    new Date(`${form.date}T${form.time}:00`) <= new Date()
+  ) {
+    return "Start time must be in the future.";
+  }
+
+  return "";
 }
 
 function EventForm({ mode = "create" }) {
   const navigate = useNavigate();
   const { id } = useParams();
-
-  const currentUser = useSelector((state) => state.auth.user);
+  const dispatch = useDispatch();
   const isEdit = mode === "edit";
 
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ ...emptyForm });
+  const user = useSelector((state) => state.auth.user);
+  const categories = useSelector(selectEventCategories);
+  const categoriesLoading = useSelector(selectCategoriesLoading);
+  const categoriesError = useSelector(selectCategoriesError);
 
+  const detail = useSelector(selectEventDetail);
+  const detailLoading = useSelector(selectEventDetailLoading);
+  const detailError = useSelector(selectEventDetailError);
+
+  const saving = useSelector(selectEventSaving);
+  const saveError = useSelector(selectEventSaveError);
+  const saveSuccess = useSelector(selectEventSaveSuccess);
+
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState(emptyForm);
   const [speakerInput, setSpeakerInput] = useState("");
   const [bannerFile, setBannerFile] = useState(null);
   const [availableCommunities, setAvailableCommunities] = useState([]);
-
-  const [loadingEvent, setLoadingEvent] = useState(isEdit);
-  const [submitting, setSubmitting] = useState(false);
-
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
+    dispatch(resetEventFormStatus());
 
-    getCommunities("", "", controller.signal)
-      .then((communities) => {
-        if (!controller.signal.aborted) {
-          setAvailableCommunities(communities);
+    const categoryRequest = dispatch(fetchEventCategories());
+
+    const communityController = new AbortController();
+
+    getCommunities("", "", communityController.signal)
+      .then((result) => {
+        if (!communityController.signal.aborted) {
+          setAvailableCommunities(result);
         }
       })
       .catch((err) => {
         if (err.name !== "AbortError") {
-          console.error("Failed to load communities:", err.message);
+          console.error(err.message);
         }
       });
 
-    return () => controller.abort();
-  }, []);
+    let detailRequest;
+
+    if (isEdit && id) {
+      detailRequest = dispatch(fetchEventDetail(id));
+    }
+
+    return () => {
+      categoryRequest.abort();
+      communityController.abort();
+      detailRequest?.abort();
+    };
+  }, [dispatch, isEdit, id]);
 
   useEffect(() => {
-    if (!isEdit) return;
+    if (!isEdit || !detail || String(detail.event_id) !== String(id)) {
+      return;
+    }
 
-    const controller = new AbortController();
+    const firstCategory = detail.categories?.[0];
+    const categoryName =
+      typeof firstCategory === "string"
+        ? firstCategory
+        : firstCategory?.category_name || "";
 
-    getEventDetail(id, controller.signal)
-      .then((event) => {
-        if (controller.signal.aborted) return;
+    const speakers = (detail.speakers || [])
+      .map((speaker) => (typeof speaker === "string" ? speaker : speaker.name))
+      .filter(Boolean);
 
-        const category = event.categories[0];
+    const communityID =
+      detail.community?.community_id ?? detail.community_id ?? "";
 
-        const speakers = event.speakers
-          .map((speaker) =>
-            typeof speaker === "string" ? speaker : speaker.name,
-          )
-          .filter(Boolean);
+    setForm({
+      title: detail.title || "",
+      description: detail.description || "",
+      category: categoryName,
+      community: communityID ? String(communityID) : "",
+      image: getImageUrl(detail.banner_url),
+      date: String(detail.event_date || "").slice(0, 10),
+      time: String(detail.start_time || "").slice(0, 5),
+      endTime: String(detail.end_time || "").slice(0, 5),
+      eventFormat: detail.format === "online" ? "online" : "in-person",
+      location: detail.location || "",
+      capacity: detail.capacity ?? 100,
+      speakers,
+    });
+  }, [isEdit, detail, id]);
 
-        const communityID =
-          event.community?.community_id ?? event.community_id ?? "";
+  useEffect(() => {
+    if (!saveSuccess) return;
 
-        setForm({
-          title: event.title || "",
-          description: event.description || "",
-          category:
-            typeof category === "string"
-              ? category
-              : category?.category_name || "",
-          community: Number(communityID) > 0 ? String(communityID) : "",
-          image: getImageUrl(event.banner_url),
-          date: String(event.event_date || "").slice(0, 10),
-          time: String(event.start_time || "").slice(0, 5),
-          endTime: String(event.end_time || "").slice(0, 5),
-          eventFormat: event.format === "online" ? "online" : "in-person",
-          location: event.location || "",
-          capacity: event.capacity ?? 100,
-          speakers,
-        });
-
-        setError("");
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(err.message || "Failed to load event.");
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoadingEvent(false);
-        }
-      });
-
-    return () => controller.abort();
-  }, [isEdit, id]);
+    const nextPath = isEdit ? "/dashboard" : "/event";
+    navigate(nextPath, { replace: true });
+  }, [saveSuccess, navigate, isEdit]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -138,94 +196,76 @@ function EventForm({ mode = "create" }) {
       ...previous,
       [name]: value,
     }));
+
+    setError("");
   }
 
-  function resizeImageFile(file, maxWidth = 1280, quality = 0.7) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  function handleFormatChange(format) {
+    setForm((previous) => ({
+      ...previous,
+      eventFormat: format,
+      location: format === "online" ? "" : previous.location,
+    }));
 
-      reader.onerror = () => reject(reader.error);
-
-      reader.onload = () => {
-        const img = new Image();
-
-        img.onerror = () => reject(new Error("Invalid image file."));
-
-        img.onload = () => {
-          const scale = Math.min(1, maxWidth / img.width);
-
-          const canvas = document.createElement("canvas");
-
-          canvas.width = img.width * scale;
-          canvas.height = img.height * scale;
-
-          const ctx = canvas.getContext("2d");
-
-          if (!ctx) {
-            reject(new Error("Canvas is not available."));
-            return;
-          }
-
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-          resolve(canvas.toDataURL("image/jpeg", quality));
-        };
-
-        img.src = reader.result;
-      };
-
-      reader.readAsDataURL(file);
-    });
+    setError("");
   }
 
-  async function processImageFile(file) {
+  function handleCategorySelect(category) {
+    setForm((previous) => ({
+      ...previous,
+      category: previous.category === category ? "" : category,
+    }));
+
+    setError("");
+  }
+
+  function handleImageChange(event) {
+    const file = event.target.files?.[0];
     if (!file) return;
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-    if (!allowedTypes.includes(file.type)) {
-      setError("File must be JPG, PNG, or WEBP.");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Cover must be JPG, PNG, or WEBP.");
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      setError("Maximum file size is 2 MB.");
+      setError("Maximum cover size is 2 MB.");
       return;
     }
 
+    setBannerFile(file);
     setError("");
 
-    try {
-      const preview = await resizeImageFile(file);
+    const reader = new FileReader();
 
+    reader.onload = () => {
       setForm((previous) => ({
         ...previous,
-        image: preview,
+        image: reader.result,
       }));
+    };
 
-      setBannerFile(file);
-    } catch {
-      setError("Failed to process the image.");
-    }
-  }
+    reader.onerror = () => setError("Failed to read image.");
 
-  function handleImageChange(event) {
-    processImageFile(event.target.files?.[0]);
-  }
-
-  function handleDrop(event) {
-    event.preventDefault();
-    processImageFile(event.dataTransfer.files?.[0]);
+    reader.readAsDataURL(file);
   }
 
   function addSpeaker() {
-    const speaker = speakerInput.trim();
+    const name = speakerInput.trim();
 
-    if (!speaker) return;
+    if (!name || name.length > 100) return;
+
+    if (
+      form.speakers.some(
+        (speaker) => speaker.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      return;
+    }
 
     setForm((previous) => ({
       ...previous,
-      speakers: [...previous.speakers, speaker],
+      speakers: [...previous.speakers, name],
     }));
 
     setSpeakerInput("");
@@ -238,322 +278,268 @@ function EventForm({ mode = "create" }) {
     }));
   }
 
-  function validateStep() {
-    setError("");
-
-    if (step === 1) {
-      if (!form.title.trim() || !form.category) {
-        setError("Please complete the event title and category.");
-        return false;
+  function validateStep(targetStep) {
+    if (targetStep === 1) {
+      if (!form.title.trim() || form.title.trim().length > 150) {
+        return "Title is required and must not exceed 150 characters.";
       }
-    }
 
-    if (step === 2) {
+      if (!form.category) {
+        return "Please select an event category.";
+      }
+
       if (
-        !form.date ||
-        !form.time ||
-        !form.endTime ||
-        !form.location.trim() ||
-        Number(form.capacity) <= 0
+        categories.length > 0 &&
+        !categories.some((item) => item.category_name === form.category)
       ) {
-        setError("Please complete the date, time, location, and capacity.");
-        return false;
+        return "Please select a valid category.";
       }
 
-      if (form.endTime <= form.time) {
-        setError("End time must be after start time.");
-        return false;
+      if (categoriesError) {
+        return "Categories could not be loaded.";
       }
     }
 
-    return true;
+    if (targetStep === 2) {
+      const scheduleError = validateSchedule(form);
+
+      if (scheduleError) return scheduleError;
+
+      if (form.eventFormat === "in-person" && !form.location.trim()) {
+        return "Location is required for an in-person event.";
+      }
+
+      const capacity = Number(form.capacity);
+
+      if (!Number.isInteger(capacity) || capacity <= 0) {
+        return "Capacity must be a positive whole number.";
+      }
+    }
+
+    return "";
   }
 
   function handleContinue() {
-    if (!validateStep()) return;
+    const validationError = validateStep(step);
 
-    setStep((previous) => previous + 1);
-  }
-
-  function handleFormKeyDown(event) {
-    if (event.key !== "Enter" || event.target.tagName === "TEXTAREA") {
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    event.preventDefault();
-
-    if (step < 3) {
-      handleContinue();
-    }
+    setError("");
+    setStep((previous) => Math.min(3, previous + 1));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (step !== 3 || submitting) return;
+    if (step !== 3 || saving) return;
+
+    const validationError = validateStep(1) || validateStep(2);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     setError("");
-    setSubmitting(true);
 
     try {
       if (isEdit) {
-        await updateEvent(id, form, bannerFile);
+        await dispatch(
+          updateExistingEvent({
+            eventId: id,
+            form,
+            bannerFile,
+          }),
+        ).unwrap();
       } else {
-        await createEvent(form, bannerFile);
+        await dispatch(
+          createNewEvent({
+            form,
+            bannerFile,
+          }),
+        ).unwrap();
       }
-
-      setSuccess(true);
-
-      window.setTimeout(() => {
-        navigate(isEdit ? "/dashboard" : "/event");
-      }, 1800);
-    } catch (err) {
-      setError(err.message || "Failed to save event.");
-    } finally {
-      setSubmitting(false);
+    } catch {
+      // Error disimpan di Redux.
     }
   }
 
-  if (currentUser?.role !== "organizer") {
+  if (user?.role !== "organizer") {
     return (
       <main className="p-10 text-center">
         <h1 className="text-2xl font-bold">Access denied</h1>
-
-        <p className="mt-2 text-gray-secondary">
-          Only organizers can manage events.
-        </p>
+        <p>Only organizers can manage events.</p>
       </main>
     );
   }
 
-  if (loadingEvent) {
+  if (isEdit && detailLoading) {
+    return <main className="p-10 text-center">Loading event data...</main>;
+  }
+
+  if (isEdit && (detailError || !detail)) {
     return (
       <main className="p-10 text-center">
-        <p className="text-gray-secondary">Loading event data...</p>
-      </main>
-    );
-  }
-
-  if (success) {
-    return (
-      <main className="min-h-screen bg-white">
-        <div className="flex min-h-[75vh] flex-col items-center justify-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-500">
-            ✓
-          </div>
-
-          <h1 className="mt-4 text-xl font-semibold text-gray-900">
-            {isEdit ? "Event Updated!" : "Event Created!"}
-          </h1>
-
-          <p className="mt-1 text-sm text-gray-400">
-            {isEdit
-              ? "Redirecting to your dashboard..."
-              : "Redirecting to event list..."}
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  // ✅ TAMBAH: Jangan tampilkan form kosong jika gagal load Edit
-  if (isEdit && error && !form.title) {
-    return (
-      <main className="mx-auto max-w-2xl p-10">
-        <p role="alert" className="text-red-600">
-          {error}
+        <p role="alert" className="text-red-500">
+          {detailError || "Event not found."}
         </p>
-
         <button
           type="button"
           onClick={() => navigate("/dashboard")}
           className="mt-4 text-orange-primary"
         >
-          ← Back to Dashboard
+          Back to Dashboard
         </button>
       </main>
     );
   }
 
+  const inputClass =
+    "w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary";
+
   return (
     <main className="min-h-screen bg-[#fafafa]">
       <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-8 py-4">
-          <div className="flex items-center gap-5">
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard")}
-              className="text-sm text-gray-500 hover:text-orange-primary"
-            >
-              ← Back
-            </button>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="text-sm text-gray-500 hover:text-orange-primary"
+          >
+            Back to Dashboard
+          </button>
 
-            <h1 className="text-lg font-semibold text-gray-900">
-              {isEdit ? "Edit Event" : "Create Event"}
-            </h1>
-          </div>
+          <h1 className="text-lg font-semibold text-gray-900">
+            {isEdit ? "Edit Event" : "Create Event"}
+          </h1>
 
-          <div className="flex items-center gap-3">
-            {[1, 2, 3].map((item, index) => (
-              <div key={item} className="flex items-center gap-3">
-                <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
-                    step >= item
-                      ? "bg-orange-primary text-white"
-                      : "bg-gray-200 text-gray-500"
-                  }`}
-                >
-                  {step > item ? "✓" : item}
-                </div>
-
-                {index < 2 && <div className="h-px w-8 bg-gray-200" />}
-              </div>
-            ))}
-          </div>
+          <span className="text-sm text-gray-500">Step {step} of 3</span>
         </div>
       </div>
 
       <div className="mx-auto max-w-2xl px-6 py-8">
-        {error && (
+        {(error || saveError) && (
           <div
             role="alert"
             className="mb-5 rounded-lg bg-red-50 p-3 text-sm text-red-600"
           >
-            {error}
+            {error || saveError}
           </div>
         )}
 
         <form
           onSubmit={handleSubmit}
-          onKeyDown={handleFormKeyDown}
-          className="rounded-xl bg-white px-8 py-7 shadow-sm"
+          className="rounded-xl bg-white px-6 py-7 shadow-sm md:px-8"
         >
           {step === 1 && (
             <>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Basic Information
-              </h2>
+              <h2 className="text-xl font-semibold">Basic Information</h2>
 
               <p className="mt-1 text-sm text-gray-500">
                 Tell attendees what your event is about.
               </p>
 
               <div className="mt-6">
-                <label className="mb-2 block text-sm font-medium">
-                  Cover Image
+                <label htmlFor="eventTitle" className="mb-2 block text-sm">
+                  Event Title
                 </label>
-
-                <label
-                  htmlFor="coverImage"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={handleDrop}
-                  className="flex h-28 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-gray-300 hover:border-orange-primary"
-                >
-                  {form.image ? (
-                    <img
-                      src={form.image}
-                      alt="Event cover"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <div className="text-2xl">⇧</div>
-
-                      <p className="mt-1 text-sm">
-                        Click to upload or drag and drop
-                      </p>
-
-                      <p className="text-xs">
-                        PNG, JPG, WEBP up to 2MB · 16:9 recommended
-                      </p>
-                    </div>
-                  )}
-                </label>
-
                 <input
-                  id="coverImage"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleImageChange}
-                  className="hidden"
+                  id="eventTitle"
+                  name="title"
+                  value={form.title}
+                  onChange={handleChange}
+                  maxLength={150}
+                  placeholder="Go Concurrency Workshop"
+                  className={inputClass}
                 />
+              </div>
 
-                {isEdit && (
-                  <p className="mt-2 text-xs text-gray-400">
-                    Leave unchanged to keep the current banner.
-                  </p>
+              <div className="mt-5">
+                <label
+                  htmlFor="eventDescription"
+                  className="mb-2 block text-sm"
+                >
+                  Description
+                </label>
+                <textarea
+                  id="eventDescription"
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  rows={4}
+                  className={inputClass}
+                  placeholder="What will attendees learn?"
+                />
+              </div>
+
+              <div className="mt-5">
+                <p className="mb-2 text-sm">Category</p>
+
+                {categoriesLoading && (
+                  <p className="text-sm text-gray-500">Loading categories...</p>
+                )}
+
+                {categoriesError && (
+                  <button
+                    type="button"
+                    onClick={() => dispatch(fetchEventCategories())}
+                    className="text-sm text-red-500 underline"
+                  >
+                    Failed to load categories. Retry
+                  </button>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {categories.map((category) => (
+                    <button
+                      type="button"
+                      key={category.category_id}
+                      onClick={() =>
+                        handleCategorySelect(category.category_name)
+                      }
+                      className={`rounded-full border px-3 py-2 text-sm ${
+                        form.category === category.category_name
+                          ? "border-orange-primary bg-orange-primary text-white"
+                          : "border-gray-200 text-gray-600"
+                      }`}
+                    >
+                      {category.category_name}
+                    </button>
+                  ))}
+                </div>
+
+                {form.category && (
+                  <button
+                    type="button"
+                    onClick={() => handleCategorySelect(form.category)}
+                    className="mt-3 rounded-full bg-orange-50 px-3 py-1 text-xs text-orange-primary"
+                  >
+                    {form.category} ×
+                  </button>
                 )}
               </div>
 
               <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
-                  Event Title
-                </label>
-
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleChange}
-                  placeholder="Go Concurrency Workshop"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
-                />
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
-                  Description
-                </label>
-
-                <textarea
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  rows="4"
-                  placeholder="What will attendees learn or experience?"
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
-                />
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
-                  Category
+                <label htmlFor="eventCommunity" className="mb-2 block text-sm">
+                  Community (optional)
                 </label>
 
                 <select
-                  name="category"
-                  value={form.category}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
-                >
-                  <option value="">Select a category</option>
-                  <option value="Technology">Technology</option>
-                  <option value="Design">Design</option>
-                  <option value="Business">Business</option>
-                  <option value="AI">AI</option>
-                  <option value="Programming">Programming</option>
-                  <option value="Career">Career</option>
-                </select>
-              </div>
-
-              <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
-                  Community{" "}
-                  <span className="font-normal text-gray-400">(optional)</span>
-                </label>
-
-                <select
+                  id="eventCommunity"
                   name="community"
                   value={form.community}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                  className={inputClass}
                 >
                   <option value="">No community</option>
 
                   {form.community &&
                     !availableCommunities.some(
                       (community) =>
-                        String(community.community_id) ===
-                        String(form.community),
+                        String(community.community_id) === form.community,
                     ) && (
                       <option value={form.community}>
                         Current community (ID {form.community})
@@ -570,132 +556,148 @@ function EventForm({ mode = "create" }) {
                   ))}
                 </select>
               </div>
+
+              <div className="mt-5">
+                <label htmlFor="eventBanner" className="mb-2 block text-sm">
+                  Cover Image
+                </label>
+
+                {form.image && (
+                  <img
+                    src={form.image}
+                    alt="Cover preview"
+                    className="mb-3 h-40 w-full rounded-lg object-cover"
+                  />
+                )}
+
+                <input
+                  id="eventBanner"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleImageChange}
+                  className={inputClass}
+                />
+
+                {isEdit && (
+                  <p className="mt-2 text-xs text-gray-400">
+                    Leave empty to keep the current banner.
+                  </p>
+                )}
+              </div>
             </>
           )}
 
           {step === 2 && (
             <>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Date, Location & Capacity
-              </h2>
-
-              <p className="mt-1 text-sm text-gray-500">
-                When and where is your event?
-              </p>
+              <h2 className="text-xl font-semibold">Date, Format & Capacity</h2>
 
               <div className="mt-6">
-                <label className="mb-2 block text-sm font-medium">
+                <label htmlFor="eventDate" className="mb-2 block text-sm">
                   Event Date
                 </label>
-
                 <input
+                  id="eventDate"
                   type="date"
                   name="date"
+                  min={getLocalToday()}
                   value={form.date}
                   onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                  className={inputClass}
                 />
               </div>
 
               <div className="mt-5 grid gap-5 md:grid-cols-2">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
+                  <label htmlFor="startTime" className="mb-2 block text-sm">
                     Start Time
                   </label>
-
                   <input
+                    id="startTime"
                     type="time"
                     name="time"
                     value={form.time}
                     onChange={handleChange}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                    className={inputClass}
                   />
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">
+                  <label htmlFor="endTime" className="mb-2 block text-sm">
                     End Time
                   </label>
-
                   <input
+                    id="endTime"
                     type="time"
                     name="endTime"
                     value={form.endTime}
                     onChange={handleChange}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                    className={inputClass}
                   />
                 </div>
               </div>
 
               <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
-                  Event Format
-                </label>
+                <p className="mb-2 text-sm">Event Format</p>
 
-                <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      setForm((previous) => ({
-                        ...previous,
-                        eventFormat: "in-person",
-                      }))
-                    }
-                    className={`rounded-md px-4 py-2 text-sm ${
+                    onClick={() => handleFormatChange("in-person")}
+                    className={`rounded-lg px-4 py-2 text-sm ${
                       form.eventFormat === "in-person"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500"
+                        ? "bg-orange-primary text-white"
+                        : "border border-gray-200"
                     }`}
                   >
-                    📍 In Person
+                    In Person
                   </button>
 
                   <button
                     type="button"
-                    onClick={() =>
-                      setForm((previous) => ({
-                        ...previous,
-                        eventFormat: "online",
-                      }))
-                    }
-                    className={`rounded-md px-4 py-2 text-sm ${
+                    onClick={() => handleFormatChange("online")}
+                    className={`rounded-lg px-4 py-2 text-sm ${
                       form.eventFormat === "online"
-                        ? "bg-white text-gray-900 shadow-sm"
-                        : "text-gray-500"
+                        ? "bg-orange-primary text-white"
+                        : "border border-gray-200"
                     }`}
                   >
-                    ▣ Online
+                    Online
                   </button>
                 </div>
               </div>
 
               <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
+                <label htmlFor="eventLocation" className="mb-2 block text-sm">
                   Location
                 </label>
-
                 <input
+                  id="eventLocation"
                   name="location"
                   value={form.location}
                   onChange={handleChange}
-                  placeholder="Bandung, West Java"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                  disabled={form.eventFormat === "online"}
+                  placeholder={
+                    form.eventFormat === "online"
+                      ? "Not required for online events"
+                      : "Bandung, West Java"
+                  }
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400`}
                 />
               </div>
 
               <div className="mt-5">
-                <label className="mb-2 block text-sm font-medium">
+                <label htmlFor="eventCapacity" className="mb-2 block text-sm">
                   Capacity
                 </label>
-
                 <input
+                  id="eventCapacity"
                   type="number"
-                  min="1"
+                  min={1}
+                  step={1}
                   name="capacity"
                   value={form.capacity}
                   onChange={handleChange}
-                  placeholder="100"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                  className={inputClass}
                 />
               </div>
             </>
@@ -703,23 +705,22 @@ function EventForm({ mode = "create" }) {
 
           {step === 3 && (
             <>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Speakers & Review
-              </h2>
+              <h2 className="text-xl font-semibold">Speakers & Review</h2>
 
               <p className="mt-1 text-sm text-gray-500">
-                Add speakers and confirm your event details.
+                Add speakers and review your event.
               </p>
 
               <div className="mt-6">
-                <label className="mb-2 block text-sm font-medium">
-                  Speakers{" "}
-                  <span className="font-normal text-gray-400">(optional)</span>
+                <label htmlFor="speakerName" className="mb-2 block text-sm">
+                  Speakers (optional)
                 </label>
 
                 <div className="flex gap-2">
                   <input
+                    id="speakerName"
                     value={speakerInput}
+                    maxLength={100}
                     onChange={(event) => setSpeakerInput(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
@@ -727,14 +728,14 @@ function EventForm({ mode = "create" }) {
                         addSpeaker();
                       }
                     }}
-                    placeholder="Speaker name and title"
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-3 text-sm outline-none focus:border-orange-primary"
+                    placeholder="Speaker name"
+                    className={inputClass}
                   />
 
                   <button
                     type="button"
                     onClick={addSpeaker}
-                    className="rounded-lg border border-gray-200 px-4 text-sm hover:border-orange-primary"
+                    className="rounded-lg border border-gray-200 px-4 text-sm"
                   >
                     Add
                   </button>
@@ -743,8 +744,8 @@ function EventForm({ mode = "create" }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {form.speakers.map((speaker, index) => (
                     <button
-                      key={`${speaker}-${index}`}
                       type="button"
+                      key={`${speaker}-${index}`}
                       onClick={() => removeSpeaker(index)}
                       className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600"
                     >
@@ -754,46 +755,50 @@ function EventForm({ mode = "create" }) {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-lg border border-gray-200">
+              <div className="mt-6 overflow-hidden rounded-lg border">
                 {[
-                  ["Title", form.title || "-"],
-                  ["Category", form.category || "-"],
-                  ["Date", form.date || "-"],
+                  ["Title", form.title],
+                  ["Category", form.category],
+                  ["Community", form.community || "None"],
+                  ["Date", form.date],
+                  ["Start Time", form.time],
+                  ["End Time", form.endTime],
+                  ["Format", form.eventFormat],
                   [
-                    "Time",
-                    form.time && form.endTime
-                      ? `${form.time} – ${form.endTime} WIB`
-                      : "-",
+                    "Location",
+                    form.eventFormat === "online"
+                      ? "Online Event"
+                      : form.location,
                   ],
-                  [
-                    "Format",
-                    form.eventFormat === "online" ? "Online" : "In Person",
-                  ],
-                  ["Location", form.location || "-"],
-                  ["Capacity", `${form.capacity} attendees`],
-                  ["Speakers", `${form.speakers.length} added`],
+                  ["Capacity", String(form.capacity)],
+                  ["Speakers", String(form.speakers.length)],
                 ].map(([label, value]) => (
                   <div
                     key={label}
-                    className="grid grid-cols-2 border-b border-gray-100 px-4 py-3 text-sm last:border-b-0"
+                    className="grid grid-cols-2 gap-3 border-b px-4 py-3 text-sm last:border-b-0"
                   >
                     <span className="text-gray-500">{label}</span>
-                    <span className="text-right text-gray-900">{value}</span>
+                    <span className="text-right wrap-break-word">
+                      {value || "-"}
+                    </span>
                   </div>
                 ))}
               </div>
             </>
           )}
 
-          <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-5">
+          <div className="mt-8 flex justify-between border-t pt-5">
             <button
               type="button"
+              disabled={saving}
               onClick={() =>
-                step === 1 ? navigate("/dashboard") : setStep(step - 1)
+                step === 1
+                  ? navigate("/dashboard")
+                  : setStep((previous) => previous - 1)
               }
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:border-orange-primary"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm"
             >
-              {step === 1 ? "Cancel" : "← Back"}
+              {step === 1 ? "Cancel" : "Back"}
             </button>
 
             {step < 3 ? (
@@ -802,19 +807,19 @@ function EventForm({ mode = "create" }) {
                 onClick={handleContinue}
                 className="rounded-lg bg-orange-primary px-5 py-2.5 text-sm text-white"
               >
-                Continue →
+                Continue
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={submitting}
-                className="rounded-lg bg-green-500 px-5 py-2.5 text-sm text-white hover:bg-green-600 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={saving}
+                className="rounded-lg bg-green-500 px-5 py-2.5 text-sm text-white disabled:opacity-50"
               >
-                {submitting
+                {saving
                   ? "Saving..."
                   : isEdit
-                    ? "✓ Save Changes"
-                    : "✓ Publish Event"}
+                    ? "Save Changes"
+                    : "Publish Event"}
               </button>
             )}
           </div>
