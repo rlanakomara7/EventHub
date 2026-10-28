@@ -4,6 +4,7 @@ import authReducer from "./slice/authSlice";
 import eventReducer from "./slice/eventSlice";
 import eventMemberReducer from "./slice/eventMemberSlice";
 import savedEventReducer from "./slice/savedEventSlice";
+import communityMemberReducer from "./slice/communityMemberSlice";
 
 import {
   persistStore,
@@ -34,6 +35,7 @@ export const store = configureStore({
     events: eventReducer,
     eventMember: eventMemberReducer,
     savedEvent: savedEventReducer,
+    communityMember: communityMemberReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

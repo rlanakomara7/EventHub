@@ -3,6 +3,9 @@ import { FiCalendar } from "react-icons/fi";
 import { FaBookmark } from "react-icons/fa";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useDispatch, useSelector } from "react-redux";
+
+import { toggleCommunityMembership } from "../redux/slice/communityMemberSlice";
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -28,32 +31,37 @@ function getSavedCommunities() {
   }
 }
 
-function CommunityCard({
-  community,
-  onAuthRequired,
-  onSavedChange,
-  onMembershipUpdated,
-}) {
+function CommunityCard({ community, onAuthRequired, onSavedChange }) {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const communityId = community.community_id ?? community.id;
+  const key = String(communityId);
 
-  // 🔄 UBAH: Tidak memakai setState di useEffect
-  const [joinedOverride, setJoinedOverride] = useState(null);
+  const reduxJoined = useSelector((state) => state.communityMember.byId[key]);
 
   const joined =
-    joinedOverride ??
+    reduxJoined ??
     (community.is_joined === true || community.isJoined === true);
 
-  const [joining, setJoining] = useState(false);
-  const [joinError, setJoinError] = useState("");
+  const joining = useSelector(
+    (state) => state.communityMember.loadingById[key] === true,
+  );
 
-  const [memberDelta, setMemberDelta] = useState(0);
+  const joinError = useSelector(
+    (state) => state.communityMember.errorById[key],
+  );
+
+  const memberDelta = useSelector(
+    (state) => state.communityMember.deltaById[key] ?? 0,
+  );
+
+  const [saveError, setSaveError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
 
   const [saved, setSaved] = useState(() =>
     getSavedCommunities().some(
-      (item) => String(item.community_id ?? item.id) === String(communityId),
+      (item) => String(item.community_id ?? item.id) === key,
     ),
   );
 
@@ -82,60 +90,26 @@ function CommunityCard({
     community.upcoming_count ?? community.upcomingEvents ?? 0,
   );
 
-  async function handleJoin() {
+  function handleJoin() {
     if (joining || communityId == null) return;
 
-    const token = localStorage.getItem("token");
-
-    if (!token) {
+    if (!localStorage.getItem("token")) {
       if (onAuthRequired) {
         onAuthRequired(community);
       } else {
-        setJoinError("Please login first.");
+        setSaveError("Please login first.");
       }
       return;
     }
 
-    const wasJoined = joined;
+    setSaveError("");
 
-    setJoining(true);
-    setJoinError("");
-
-    try {
-      const endpoint = wasJoined ? "leave" : "join";
-
-      const response = await fetch(
-        `${API_URL}/api/communities/${communityId}/${endpoint}`,
-        {
-          method: wasJoined ? "DELETE" : "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          result.message ||
-            (wasJoined
-              ? "Failed to leave community."
-              : "Failed to join community."),
-        );
-      }
-      const nextJoined = !wasJoined;
-
-      setJoinedOverride(nextJoined);
-
-      setMemberDelta((previous) => previous + (nextJoined ? 1 : -1));
-
-      onMembershipUpdated?.(communityId, nextJoined);
-    } catch (error) {
-      setJoinError(error.message || "Failed to update community membership.");
-    } finally {
-      setJoining(false);
-    }
+    dispatch(
+      toggleCommunityMembership({
+        communityId,
+        joined,
+      }),
+    );
   }
 
   function handleSave(event) {
@@ -149,13 +123,12 @@ function CommunityCard({
     const savedCommunities = getSavedCommunities();
 
     const alreadySaved = savedCommunities.some(
-      (item) => String(item.community_id ?? item.id) === String(communityId),
+      (item) => String(item.community_id ?? item.id) === key,
     );
 
     const updated = alreadySaved
       ? savedCommunities.filter(
-          (item) =>
-            String(item.community_id ?? item.id) !== String(communityId),
+          (item) => String(item.community_id ?? item.id) !== key,
         )
       : [
           ...savedCommunities,
@@ -172,14 +145,14 @@ function CommunityCard({
 
       setSaved(nextSaved);
       onSavedChange?.(community, nextSaved);
+      setSaveError("");
     } catch {
-      setJoinError("Failed to save community in this browser.");
+      setSaveError("Failed to save community in this browser.");
     }
   }
 
   return (
     <article className="flex h-full min-w-0 w-full flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
-      {/* BANNER */}
       <button
         type="button"
         onClick={() => navigate(`/communities/${communityId}`)}
@@ -201,9 +174,7 @@ function CommunityCard({
         )}
       </button>
 
-      {/* BODY */}
       <div className="flex min-w-0 flex-1 flex-col p-4">
-        {/* NAMA KOMUNITAS */}
         <button
           type="button"
           onClick={() => navigate(`/communities/${communityId}`)}
@@ -212,12 +183,10 @@ function CommunityCard({
           {community.name}
         </button>
 
-        {/* DESCRIPTION */}
         <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-gray-secondary">
           {community.description}
         </p>
 
-        {/* CATEGORY */}
         <div className="mt-3 flex min-h-6 flex-wrap gap-1.5">
           {categories.length > 0 ? (
             categories.map((category, index) => (
@@ -233,30 +202,25 @@ function CommunityCard({
           )}
         </div>
 
-        {/* MEMBER COUNT */}
         <div className="mt-auto pt-4">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-secondary">
             <div className="flex items-center gap-1">
               <MdPeopleAlt />
-
               <span>{members.toLocaleString("id-ID")} members</span>
             </div>
 
             <div className="flex items-center gap-1">
               <FiCalendar />
-
               <span>{upcomingEvents} upcoming</span>
             </div>
           </div>
 
-          {/* ERROR MESSAGE */}
-          {joinError && (
+          {(joinError || saveError) && (
             <p role="alert" className="mt-3 text-xs text-red-600">
-              {joinError}
+              {joinError || saveError}
             </p>
           )}
 
-          {/* JOIN / LEAVE */}
           <div className="mt-3 flex w-full items-center gap-2">
             <button
               type="button"
@@ -273,7 +237,6 @@ function CommunityCard({
                   : "Join Community"}
             </button>
 
-            {/* BOOKMARK */}
             <button
               type="button"
               onClick={handleSave}

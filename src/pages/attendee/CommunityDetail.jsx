@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router";
 import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { MdPeopleAlt } from "react-icons/md";
 import { FiCalendar, FiMapPin, FiSend } from "react-icons/fi";
 
@@ -11,6 +12,12 @@ import {
   resolveMediaUrl,
 } from "../../services/exploreService";
 import CommunityMembers from "../../components/CommunityMembers";
+
+import { selectUser } from "../../redux/slice/authSlice";
+import {
+  fetchCommunityMemberships,
+  toggleCommunityMembership,
+} from "../../redux/slice/communityMemberSlice";
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -47,6 +54,25 @@ function normalizeCommunity(item) {
 function CommunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector(selectUser);
+
+  const joinedFromRedux = useSelector(
+    (state) => state.communityMember.byId[String(id)],
+  );
+
+  const joining = useSelector(
+    (state) => state.communityMember.loadingById[String(id)] === true,
+  );
+
+  const membershipLoading = useSelector(
+    (state) => state.communityMember.loading,
+  );
+
+  const membershipError = useSelector(
+    (state) => state.communityMember.errorById[String(id)],
+  );
+
   const [memberCountFromApi, setMemberCountFromApi] = useState(null);
   const [community, setCommunity] = useState(null);
   const [communityEvents, setCommunityEvents] = useState([]);
@@ -60,16 +86,25 @@ function CommunityDetail() {
   const [eventsError, setEventsError] = useState("");
   const [actionError, setActionError] = useState("");
 
-  const [joined, setJoined] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [memberDelta, setMemberDelta] = useState(0);
   const [bannerFailed, setBannerFailed] = useState(false);
+
+  const joined = joinedFromRedux ?? community?.is_joined === true;
+
+  useEffect(() => {
+    if (!user || !localStorage.getItem("token")) return;
+
+    const request = dispatch(fetchCommunityMemberships());
+
+    return () => request.abort();
+  }, [dispatch, user]);
 
   useEffect(() => {
     const controller = new AbortController();
 
     async function loadCommunityDetail() {
       let communityLoaded = false;
+
       try {
         let communities;
 
@@ -96,9 +131,9 @@ function CommunityDetail() {
         }
 
         setCommunity(selected);
-        communityLoaded = true;
-        setJoined(selected.is_joined === true);
+        setMemberCountFromApi(null);
         setMemberDelta(0);
+        communityLoaded = true;
         setLoading(false);
 
         const events = await getExploreEvents();
@@ -178,62 +213,34 @@ function CommunityDetail() {
       }
     }
 
-    // Reset dilakukan saat ID komunitas berubah
     loadCommunityDetail();
 
     return () => controller.abort();
   }, [id]);
 
   async function handleCommunityMembership() {
-    if (!community || joining) return;
+    if (!community || joining || membershipLoading) return;
 
-    const token = localStorage.getItem("token");
-
-    if (!token) {
+    if (!user || !localStorage.getItem("token")) {
       setActionError("Please login to join this community.");
       return;
     }
 
-    const communityId = getCommunityId(community);
-    const wasJoined = joined;
-
-    setJoining(true);
     setActionError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/communities/${communityId}/${
-          wasJoined ? "leave" : "join"
-        }`,
-        {
-          method: wasJoined ? "DELETE" : "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
+      await dispatch(
+        toggleCommunityMembership({
+          communityId: getCommunityId(community),
+          joined,
+        }),
+      ).unwrap();
 
-      const result = await response.json().catch(() => ({}));
+      setMemberDelta((previous) => previous + (joined ? -1 : 1));
 
-      if (!response.ok) {
-        const message =
-          result.message || "Failed to update community membership.";
-
-        if (!wasJoined && /already/i.test(message)) {
-          setJoined(true);
-          return;
-        }
-
-        throw new Error(message);
-      }
-
-      setJoined(!wasJoined);
-
-      setMemberDelta((previous) => previous + (wasJoined ? -1 : 1));
+      setMemberCountFromApi(null);
     } catch (err) {
       setActionError(err.message || "Failed to update community membership.");
-    } finally {
-      setJoining(false);
     }
   }
 
@@ -308,7 +315,6 @@ function CommunityDetail() {
           <div className="absolute inset-0 bg-slate-700" />
         )}
 
-        {/* Overlay agar tulisan selalu terbaca */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
 
         <div className="absolute inset-x-0 bottom-0">
@@ -341,7 +347,7 @@ function CommunityDetail() {
             <button
               type="button"
               onClick={handleCommunityMembership}
-              disabled={joining}
+              disabled={joining || membershipLoading}
               className={`w-fit shrink-0 rounded-lg px-5 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 ${
                 joined ? "bg-green-primary" : "bg-orange-primary"
               }`}
@@ -376,9 +382,9 @@ function CommunityDetail() {
             </div>
           )}
 
-          {actionError && (
+          {(actionError || membershipError) && (
             <p role="alert" className="mt-3 text-xs text-red-600">
-              {actionError}
+              {actionError || membershipError}
             </p>
           )}
         </div>
@@ -465,8 +471,6 @@ function CommunityDetail() {
         {/* DISCUSSION */}
         {activeTab === "Discussion" && (
           <section className="mt-6">
-            {/* Bentuk input mengikuti referensi,
-                tetapi tidak membuat komentar palsu */}
             <div className="flex items-center gap-3">
               <img
                 src="/Default-Avatar.svg"
