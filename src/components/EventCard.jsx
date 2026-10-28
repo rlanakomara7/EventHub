@@ -138,83 +138,89 @@ function EventCard({
 
   return (
     <article className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-white">
+      {/* Event banner */}
       <button
         type="button"
         onClick={() => onEventClick(eventId)}
-        className="block h-44 w-full shrink-0 overflow-hidden bg-gray-100"
+        className="relative block h-44 w-full shrink-0 overflow-hidden bg-gray-100"
         aria-label={`View ${event.title}`}
       >
         {bannerUrl && !imageFailed ? (
           <img
             src={bannerUrl}
             alt={event.title}
-            className="block h-full w-full object-cover"
+            className="h-full w-full object-cover"
             loading="lazy"
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-gray-400">
+          <div className="flex h-full items-center justify-center text-sm text-gray-400">
             No event image
           </div>
         )}
+
+        {/* Categories */}
+        <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
+          {categories.map((category, index) => {
+            const name =
+              typeof category === "string"
+                ? category
+                : (category.category_name ?? category.name);
+
+            if (!name) return null;
+
+            return (
+              <span
+                key={`${name}-${index}`}
+                className="rounded-full bg-black/60 px-2 py-1 text-xs text-white"
+              >
+                {name}
+              </span>
+            );
+          })}
+        </div>
       </button>
 
-      <div className="flex min-w-0 flex-1 flex-col p-4">
-        <div className="space-y-3">
-          <h3 className="min-h-12 text-base font-bold leading-6 md:text-lg">
+      <div className="flex min-w-0 flex-1 flex-col px-4 pb-4 pt-3">
+        <div className="space-y-1.5">
+          {/* Title */}
+          <h3 className="text-base font-semibold leading-6">
             <button
               type="button"
               onClick={() => onEventClick(eventId)}
-              className="line-clamp-2 w-full wrap-break-word text-left hover:text-orange-primary"
+              className="line-clamp-2 w-full break-words text-left hover:text-orange-primary"
             >
               {event.title}
             </button>
           </h3>
 
-          <div className="flex min-h-6 flex-wrap gap-1.5">
-            {categories.map((category, index) => {
-              const categoryName =
-                typeof category === "string"
-                  ? category
-                  : (category.category_name ?? category.name);
-
-              if (!categoryName) return null;
-
-              return (
-                <span
-                  key={`${categoryName}-${index}`}
-                  className="rounded-full bg-orange-primary/10 px-2 py-1 text-xs text-orange-primary"
-                >
-                  {categoryName}
-                </span>
-              );
-            })}
-          </div>
-
-          <div className="flex min-w-0 items-start gap-2 text-sm text-gray-secondary">
-            <FiCalendar className="mt-0.5 shrink-0" />
-
-            <p className="min-w-0">
+          {/* Date */}
+          <div className="flex items-center gap-2 text-xs text-gray-secondary">
+            <FiCalendar className="shrink-0" />
+            <span>
               {date || "-"}
               {time ? ` · ${time} WIB` : ""}
-            </p>
+            </span>
           </div>
 
-          <div className="flex min-w-0 items-start gap-2 text-sm text-gray-secondary">
-            <FaLocationPin className="mt-0.5 shrink-0" />
-
-            <p className="min-w-0 wrap-break-word">
+          {/* Location */}
+          <div className="flex items-center gap-2 text-xs text-gray-secondary">
+            <FaLocationPin className="shrink-0" />
+            <span className="truncate">
               {event.location || (event.format === "online" ? "Online" : "-")}
-            </p>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-secondary">
+          {/* Attendees */}
+          <div className="flex items-center gap-2 text-xs text-gray-secondary">
             <MdPeopleAlt className="shrink-0" />
-            <p>{percentage}% attendees</p>
+            <span>
+              {attendees} / {capacity} attendees
+            </span>
           </div>
         </div>
 
-        <div className="mt-auto pt-5">
+        <div className="mt-auto pt-3">
           <div className="flex items-center justify-between gap-2 text-xs text-gray-secondary">
             <p>{attendees} attendees</p>
             <p>{capacity} capacity</p>
