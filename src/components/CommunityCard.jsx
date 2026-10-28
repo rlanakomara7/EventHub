@@ -7,6 +7,11 @@ import { useDispatch, useSelector } from "react-redux";
 
 import { toggleCommunityMembership } from "../redux/slice/communityMemberSlice";
 
+import {
+  saveCommunity,
+  unsaveCommunity,
+} from "../redux/slice/savedCommunitySlice";
+
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
 function resolveImage(path) {
@@ -21,17 +26,7 @@ function resolveImage(path) {
   return `${API_URL}/${String(path).replace(/^\/+/, "")}`;
 }
 
-function getSavedCommunities() {
-  try {
-    const data = JSON.parse(localStorage.getItem("savedCommunities") || "[]");
-
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-function CommunityCard({ community, onAuthRequired, onSavedChange }) {
+function CommunityCard({ community, onAuthRequired }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -56,14 +51,20 @@ function CommunityCard({ community, onAuthRequired, onSavedChange }) {
     (state) => state.communityMember.deltaById[key] ?? 0,
   );
 
-  const [saveError, setSaveError] = useState("");
-  const [imageFailed, setImageFailed] = useState(false);
+  const saved = useSelector((state) => state.savedCommunity.ids.includes(key));
 
-  const [saved, setSaved] = useState(() =>
-    getSavedCommunities().some(
-      (item) => String(item.community_id ?? item.id) === key,
-    ),
+  const saving = useSelector(
+    (state) => state.savedCommunity.actionLoadingById[key] === true,
   );
+
+  const savedLoading = useSelector((state) => state.savedCommunity.loading);
+
+  const savedError = useSelector(
+    (state) => state.savedCommunity.errorById[key],
+  );
+
+  const [localError, setLocalError] = useState("");
+  const [imageFailed, setImageFailed] = useState(false);
 
   const image = resolveImage(community.banner_url || community.image);
 
@@ -97,12 +98,12 @@ function CommunityCard({ community, onAuthRequired, onSavedChange }) {
       if (onAuthRequired) {
         onAuthRequired(community);
       } else {
-        setSaveError("Please login first.");
+        setLocalError("Please login first.");
       }
       return;
     }
 
-    setSaveError("");
+    setLocalError("");
 
     dispatch(
       toggleCommunityMembership({
@@ -112,42 +113,30 @@ function CommunityCard({ community, onAuthRequired, onSavedChange }) {
     );
   }
 
-  function handleSave(event) {
+  async function handleSave(event) {
     event.stopPropagation();
 
+    if (communityId == null || saving || savedLoading) return;
+
     if (!localStorage.getItem("token")) {
-      onAuthRequired?.(community);
+      if (onAuthRequired) {
+        onAuthRequired(community);
+      } else {
+        setLocalError("Please login first.");
+      }
       return;
     }
 
-    const savedCommunities = getSavedCommunities();
-
-    const alreadySaved = savedCommunities.some(
-      (item) => String(item.community_id ?? item.id) === key,
-    );
-
-    const updated = alreadySaved
-      ? savedCommunities.filter(
-          (item) => String(item.community_id ?? item.id) !== key,
-        )
-      : [
-          ...savedCommunities,
-          {
-            ...community,
-            community_id: communityId,
-          },
-        ];
+    setLocalError("");
 
     try {
-      localStorage.setItem("savedCommunities", JSON.stringify(updated));
-
-      const nextSaved = !alreadySaved;
-
-      setSaved(nextSaved);
-      onSavedChange?.(community, nextSaved);
-      setSaveError("");
+      if (saved) {
+        await dispatch(unsaveCommunity(communityId)).unwrap();
+      } else {
+        await dispatch(saveCommunity(community)).unwrap();
+      }
     } catch {
-      setSaveError("Failed to save community in this browser.");
+      // Error ditampilkan dari Redux.
     }
   }
 
@@ -215,9 +204,9 @@ function CommunityCard({ community, onAuthRequired, onSavedChange }) {
             </div>
           </div>
 
-          {(joinError || saveError) && (
+          {(joinError || savedError || localError) && (
             <p role="alert" className="mt-3 text-xs text-red-600">
-              {joinError || saveError}
+              {joinError || savedError || localError}
             </p>
           )}
 
@@ -240,8 +229,9 @@ function CommunityCard({ community, onAuthRequired, onSavedChange }) {
             <button
               type="button"
               onClick={handleSave}
+              disabled={saving || savedLoading || communityId == null}
               aria-label={saved ? "Unsave community" : "Save community"}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 dark:border-zinc-700 disabled:opacity-50"
             >
               <FaBookmark
                 className={saved ? "text-orange-primary" : "text-gray-400"}

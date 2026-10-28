@@ -5,17 +5,22 @@ import CommunityCard from "./CommunityCard";
 
 import { selectUser } from "../redux/slice/authSlice";
 import { fetchCommunityMemberships } from "../redux/slice/communityMemberSlice";
+import { fetchSavedCommunities } from "../redux/slice/savedCommunitySlice";
 
-function CommunityList({ communities = [], onAuthRequired, onSavedChange }) {
+function CommunityList({ communities = [], onAuthRequired }) {
   const dispatch = useDispatch();
   const user = useSelector(selectUser);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !localStorage.getItem("token")) return;
 
-    const request = dispatch(fetchCommunityMemberships());
+    const memberRequest = dispatch(fetchCommunityMemberships());
+    const savedRequest = dispatch(fetchSavedCommunities());
 
-    return () => request.abort();
+    return () => {
+      memberRequest.abort();
+      savedRequest.abort();
+    };
   }, [dispatch, user]);
 
   return (
@@ -28,7 +33,6 @@ function CommunityList({ communities = [], onAuthRequired, onSavedChange }) {
             key={communityId}
             community={community}
             onAuthRequired={onAuthRequired}
-            onSavedChange={onSavedChange}
           />
         );
       })}

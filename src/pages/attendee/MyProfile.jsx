@@ -15,15 +15,33 @@ import {
   clearProfileError,
 } from "../../redux/slice/authSlice";
 
+import {
+  fetchJoinedEvents,
+  selectJoinedEvents,
+  selectMemberLoading,
+  selectMemberError,
+} from "../../redux/slice/eventMemberSlice";
+
+import {
+  fetchSavedEvents,
+  selectSavedEvents,
+  selectSavedLoading,
+  selectSavedError,
+} from "../../redux/slice/savedEventSlice";
+
+import {
+  fetchSavedCommunities,
+  selectSavedCommunities,
+  selectSavedCommunityLoading,
+  selectSavedCommunityError,
+} from "../../redux/slice/savedCommunitySlice";
+
+import { fetchCommunityMemberships } from "../../redux/slice/communityMemberSlice";
+import { getExploreCommunities } from "../../services/exploreService";
 import { getAvatarUrl } from "../../services/profileService";
 
-function readStorage(key) {
-  try {
-    const data = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
+function getId(item) {
+  return String(item.event_id ?? item.community_id ?? item.id);
 }
 
 function MyProfile() {
@@ -34,9 +52,34 @@ function MyProfile() {
   const profileLoading = useSelector(selectProfileLoading);
   const profileError = useSelector(selectProfileError);
 
+  const registeredEvents = useSelector(selectJoinedEvents) || [];
+  const eventsLoading = useSelector(selectMemberLoading);
+  const eventsError = useSelector(selectMemberError);
+
+  const savedEvents = useSelector(selectSavedEvents) || [];
+  const savedEventsLoading = useSelector(selectSavedLoading);
+  const savedEventsError = useSelector(selectSavedError);
+
+  const savedCommunities = useSelector(selectSavedCommunities) || [];
+  const savedCommunitiesLoading = useSelector(selectSavedCommunityLoading);
+  const savedCommunitiesError = useSelector(selectSavedCommunityError);
+
+  const membershipById = useSelector((state) => state.communityMember.byId);
+
+  const membershipsLoading = useSelector(
+    (state) => state.communityMember.loading,
+  );
+
+  const membershipsError = useSelector((state) => state.communityMember.error);
+
+  const [allCommunities, setAllCommunities] = useState([]);
+  const [communitiesLoading, setCommunitiesLoading] = useState(true);
+  const [communitiesError, setCommunitiesError] = useState("");
+
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [previewError, setPreviewError] = useState("");
+  const [activeTab, setActiveTab] = useState("events");
 
   const [profileForm, setProfileForm] = useState({
     name: "",
@@ -46,22 +89,9 @@ function MyProfile() {
     avatar: "",
   });
 
-  const [activeTab, setActiveTab] = useState("events");
-
-  const [registeredEvents, setRegisteredEvents] = useState(() =>
-    readStorage("registeredEvents"),
-  );
-
-  const [joinedCommunities, setJoinedCommunities] = useState(() =>
-    readStorage("joinedCommunities"),
-  );
-
-  const [savedEvents, setSavedEvents] = useState(() =>
-    readStorage("savedEvents"),
-  );
-
-  const [savedCommunities, setSavedCommunities] = useState(() =>
-    readStorage("savedCommunities"),
+  const joinedCommunities = allCommunities.filter(
+    (community) =>
+      membershipById[String(community.community_id ?? community.id)] === true,
   );
 
   useEffect(() => {
@@ -69,10 +99,50 @@ function MyProfile() {
 
     const request = dispatch(fetchProfile());
 
-    return () => {
-      request.abort();
-    };
+    return () => request.abort();
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!user || !localStorage.getItem("token")) return;
+
+    const requests = [
+      dispatch(fetchJoinedEvents()),
+      dispatch(fetchCommunityMemberships()),
+      dispatch(fetchSavedEvents()),
+      dispatch(fetchSavedCommunities()),
+    ];
+
+    return () => {
+      requests.forEach((request) => request.abort());
+    };
+  }, [dispatch, user]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadCommunities() {
+      try {
+        const data = await getExploreCommunities(controller.signal);
+
+        if (!controller.signal.aborted) {
+          setAllCommunities(data);
+          setCommunitiesError("");
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setCommunitiesError(error.message || "Failed to load communities.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setCommunitiesLoading(false);
+        }
+      }
+    }
+
+    loadCommunities();
+
+    return () => controller.abort();
+  }, []);
 
   function handleOpenEditProfile() {
     dispatch(clearProfileError());
@@ -160,108 +230,25 @@ function MyProfile() {
       setAvatarFile(null);
       setShowEditProfile(false);
     } catch {
-      // Pesan error ditangani oleh Redux.
+      // Error ditampilkan dari Redux.
     }
-  }
-
-  function handleEventClick(eventId) {
-    navigate(`/event/${eventId}`);
-  }
-
-  function handleToggleRegistered(event) {
-    const alreadyRegistered = registeredEvents.some(
-      (item) => String(item.id) === String(event.id),
-    );
-
-    const updatedEvents = alreadyRegistered
-      ? registeredEvents.filter((item) => String(item.id) !== String(event.id))
-      : [...registeredEvents, event];
-
-    localStorage.setItem("registeredEvents", JSON.stringify(updatedEvents));
-
-    setRegisteredEvents(updatedEvents);
-  }
-
-  function handleJoinedCommunityChange(community, isJoined) {
-    const updatedCommunities = isJoined
-      ? joinedCommunities.some(
-          (item) => String(item.id) === String(community.id),
-        )
-        ? joinedCommunities
-        : [...joinedCommunities, community]
-      : joinedCommunities.filter(
-          (item) => String(item.id) !== String(community.id),
-        );
-
-    localStorage.setItem(
-      "joinedCommunities",
-      JSON.stringify(updatedCommunities),
-    );
-
-    setJoinedCommunities(updatedCommunities);
-  }
-
-  function handleSavedEventChange(event, isSaved) {
-    const updatedEvents = isSaved
-      ? savedEvents.some((item) => String(item.id) === String(event.id))
-        ? savedEvents
-        : [...savedEvents, event]
-      : savedEvents.filter((item) => String(item.id) !== String(event.id));
-
-    localStorage.setItem("savedEvents", JSON.stringify(updatedEvents));
-
-    setSavedEvents(updatedEvents);
-  }
-
-  function handleSavedCommunityChange(community, isSaved) {
-    const updatedCommunities = isSaved
-      ? savedCommunities.some(
-          (item) => String(item.id) === String(community.id),
-        )
-        ? savedCommunities
-        : [...savedCommunities, community]
-      : savedCommunities.filter(
-          (item) => String(item.id) !== String(community.id),
-        );
-
-    localStorage.setItem(
-      "savedCommunities",
-      JSON.stringify(updatedCommunities),
-    );
-
-    setSavedCommunities(updatedCommunities);
   }
 
   function renderEventCard(event) {
     return (
       <EventCard
-        key={event.id ?? event.event_id}
+        key={getId(event)}
         event={event}
         isRegistered={registeredEvents.some(
-          (item) => String(item.id) === String(event.id),
+          (item) => getId(item) === getId(event),
         )}
-        onEventClick={handleEventClick}
-        onAuthRequired={() => handleToggleRegistered(event)}
-        onSavedChange={handleSavedEventChange}
+        onEventClick={(eventId) => navigate(`/event/${eventId}`)}
       />
     );
   }
 
   function renderCommunityCard(community) {
-    return (
-      <CommunityCard
-        key={community.id ?? community.community_id}
-        community={community}
-        isJoined={joinedCommunities.some(
-          (item) => String(item.id) === String(community.id),
-        )}
-        isSaved={savedCommunities.some(
-          (item) => String(item.id) === String(community.id),
-        )}
-        onJoinChange={handleJoinedCommunityChange}
-        onSavedChange={handleSavedCommunityChange}
-      />
-    );
+    return <CommunityCard key={getId(community)} community={community} />;
   }
 
   return (
@@ -274,6 +261,7 @@ function MyProfile() {
               alt={user?.name || "Profile"}
               className="h-20 w-20 rounded-2xl object-cover"
             />
+
             <span className="absolute right-0 top-0 h-4 w-4 rounded-md border-2 border-white bg-green-500" />
           </div>
 
@@ -338,7 +326,20 @@ function MyProfile() {
         <div className="mx-auto max-w-6xl px-6">
           {activeTab === "events" && (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {registeredEvents.length > 0 ? (
+              {eventsLoading ? (
+                <p className="text-sm text-gray-secondary">Loading events...</p>
+              ) : eventsError ? (
+                <div>
+                  <p className="text-sm text-red-600">{eventsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => dispatch(fetchJoinedEvents())}
+                    className="mt-2 text-orange-primary underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : registeredEvents.length > 0 ? (
                 registeredEvents.map(renderEventCard)
               ) : (
                 <p className="text-sm text-gray-secondary">
@@ -350,7 +351,25 @@ function MyProfile() {
 
           {activeTab === "communities" && (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {joinedCommunities.length > 0 ? (
+              {communitiesLoading || membershipsLoading ? (
+                <p className="text-sm text-gray-secondary">
+                  Loading communities...
+                </p>
+              ) : communitiesError || membershipsError ? (
+                <div>
+                  <p className="text-sm text-red-600">
+                    {communitiesError || membershipsError}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="mt-2 text-orange-primary underline"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : joinedCommunities.length > 0 ? (
                 joinedCommunities.map(renderCommunityCard)
               ) : (
                 <p className="text-sm text-gray-secondary">
@@ -366,7 +385,23 @@ function MyProfile() {
                 <h2 className="mb-4 text-lg font-semibold">Saved Events</h2>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  {savedEvents.length > 0 ? (
+                  {savedEventsLoading ? (
+                    <p className="text-sm text-gray-secondary">
+                      Loading saved events...
+                    </p>
+                  ) : savedEventsError ? (
+                    <div>
+                      <p className="text-sm text-red-600">{savedEventsError}</p>
+
+                      <button
+                        type="button"
+                        onClick={() => dispatch(fetchSavedEvents())}
+                        className="mt-2 text-orange-primary underline"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : savedEvents.length > 0 ? (
                     savedEvents.map(renderEventCard)
                   ) : (
                     <p className="text-sm text-gray-secondary">
@@ -382,7 +417,25 @@ function MyProfile() {
                 </h2>
 
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-                  {savedCommunities.length > 0 ? (
+                  {savedCommunitiesLoading ? (
+                    <p className="text-sm text-gray-secondary">
+                      Loading saved communities...
+                    </p>
+                  ) : savedCommunitiesError ? (
+                    <div>
+                      <p className="text-sm text-red-600">
+                        {savedCommunitiesError}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => dispatch(fetchSavedCommunities())}
+                        className="mt-2 text-orange-primary underline"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : savedCommunities.length > 0 ? (
                     savedCommunities.map(renderCommunityCard)
                   ) : (
                     <p className="text-sm text-gray-secondary">
