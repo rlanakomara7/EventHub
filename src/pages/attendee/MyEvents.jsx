@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router";
 
@@ -12,6 +12,13 @@ import {
   selectMemberError,
 } from "../../redux/slice/eventMemberSlice";
 
+import {
+  fetchSavedEvents,
+  selectSavedEvents,
+  selectSavedLoading,
+  selectSavedError,
+} from "../../redux/slice/savedEventSlice";
+
 function getEventId(event) {
   return event.event_id ?? event.id;
 }
@@ -20,19 +27,26 @@ function MyEvents() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const [activeTab, setActiveTab] = useState("upcoming");
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = sessionStorage.getItem("myEventsTab");
+    return ["upcoming", "past", "saved"].includes(tab) ? tab : "upcoming";
+  });
 
   const joinedEvents = useSelector(selectJoinedEvents) || [];
   const loading = useSelector(selectMemberLoading);
   const error = useSelector(selectMemberError);
 
-  const [savedEvents, setSavedEvents] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("savedEvents") || "[]");
-    } catch {
-      return [];
+  const savedEvents = useSelector(selectSavedEvents) || [];
+  const savedLoading = useSelector(selectSavedLoading);
+  const savedError = useSelector(selectSavedError);
+
+  useEffect(() => {
+    sessionStorage.setItem("myEventsTab", activeTab);
+
+    if (activeTab === "saved") {
+      dispatch(fetchSavedEvents());
     }
-  });
+  }, [activeTab, dispatch]);
 
   const now = new Date();
 
@@ -59,17 +73,12 @@ function MyEvents() {
         ? pastEvents
         : savedEvents;
 
-  function handleSavedChange(event, isSaved) {
-    const updated = savedEvents.filter(
-      (item) => String(getEventId(item)) !== String(getEventId(event)),
-    );
+  const currentLoading = activeTab === "saved" ? savedLoading : loading;
 
-    if (isSaved) {
-      updated.push(event);
-    }
+  const currentError = activeTab === "saved" ? savedError : error;
 
-    setSavedEvents(updated);
-    localStorage.setItem("savedEvents", JSON.stringify(updated));
+  function handleRetry() {
+    dispatch(activeTab === "saved" ? fetchSavedEvents() : fetchJoinedEvents());
   }
 
   return (
@@ -92,15 +101,19 @@ function MyEvents() {
 
       <section className="min-h-screen bg-white-secondary py-6 dark:bg-zinc-900">
         <div className="mx-auto max-w-6xl px-6">
-          {loading && activeTab !== "saved" ? (
-            <p>Loading events...</p>
-          ) : error && activeTab !== "saved" ? (
+          {currentLoading ? (
+            <p>
+              {activeTab === "saved"
+                ? "Loading saved events..."
+                : "Loading events..."}
+            </p>
+          ) : currentError ? (
             <div>
-              <p className="text-red-600">{error}</p>
+              <p className="text-red-600">{currentError}</p>
 
               <button
                 type="button"
-                onClick={() => dispatch(fetchJoinedEvents())}
+                onClick={handleRetry}
                 className="mt-2 text-orange-primary underline"
               >
                 Try Again
@@ -112,8 +125,11 @@ function MyEvents() {
                 <EventCard
                   key={getEventId(event)}
                   event={event}
+                  isRegistered={joinedEvents.some(
+                    (item) =>
+                      String(getEventId(item)) === String(getEventId(event)),
+                  )}
                   onEventClick={(id) => navigate(`/event/${id}`)}
-                  onSavedChange={handleSavedChange}
                 />
               ))}
             </div>

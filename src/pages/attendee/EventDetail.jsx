@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectUser } from "../../redux/slice/authSlice";
+
 import {
   joinEvent,
   leaveEvent,
@@ -16,6 +17,13 @@ import {
   selectJoinedIds,
   selectMemberLoading,
 } from "../../redux/slice/eventMemberSlice";
+
+import {
+  saveEvent,
+  unsaveEvent,
+  selectSavedIds,
+  selectSavedActionLoadingId,
+} from "../../redux/slice/savedEventSlice";
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 
@@ -54,6 +62,13 @@ function EventDetail() {
   const { id } = useParams();
   const user = useSelector(selectUser);
   const dispatch = useDispatch();
+  const savedIds = useSelector(selectSavedIds);
+  const savingId = useSelector(selectSavedActionLoadingId);
+
+  const saved = savedIds.includes(String(id));
+  const saving = savingId !== null && String(savingId) === String(id);
+
+  const [saveError, setSaveError] = useState("");
 
   const joinedIds = useSelector(selectJoinedIds);
   const memberLoading = useSelector(selectMemberLoading);
@@ -189,6 +204,27 @@ function EventDetail() {
       }
     } catch {
       setShareMessage("Unable to share event link.");
+    }
+  }
+
+  async function handleSave() {
+    if (!event || saving) return;
+
+    if (!user || !localStorage.getItem("token")) {
+      setSaveError("Please login to save this event.");
+      return;
+    }
+
+    setSaveError("");
+
+    try {
+      if (saved) {
+        await dispatch(unsaveEvent(id)).unwrap();
+      } else {
+        await dispatch(saveEvent(event)).unwrap();
+      }
+    } catch (error) {
+      setSaveError(error.message || "Failed to update saved event.");
     }
   }
 
@@ -494,11 +530,11 @@ function EventDetail() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  disabled
-                  title="Save event API not connected yet"
-                  className="rounded-lg border border-gray-200 py-2 text-sm opacity-50"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="rounded-lg border border-gray-200 py-2 text-sm hover:border-orange-primary disabled:opacity-50"
                 >
-                  Save
+                  {saving ? "Processing..." : saved ? "Saved" : "Save"}
                 </button>
 
                 <button
@@ -508,6 +544,11 @@ function EventDetail() {
                 >
                   Share
                 </button>
+                {saveError && (
+                  <p role="alert" className="mt-2 text-xs text-red-600">
+                    {saveError}
+                  </p>
+                )}
               </div>
 
               {shareMessage && (

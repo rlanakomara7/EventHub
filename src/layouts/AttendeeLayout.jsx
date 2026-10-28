@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Outlet } from "react-router";
 import { useDispatch, useSelector } from "react-redux";
+import { fetchSavedEvents } from "../redux/slice/savedEventSlice";
 
 import Header from "../components/Header";
 
@@ -14,9 +15,13 @@ function AttendeeLayout() {
   useEffect(() => {
     if (!user) return;
 
-    const request = dispatch(fetchJoinedEvents());
+    const joinedRequest = dispatch(fetchJoinedEvents());
+    const savedRequest = dispatch(fetchSavedEvents());
 
-    return () => request.abort();
+    return () => {
+      joinedRequest.abort();
+      savedRequest.abort();
+    };
   }, [dispatch, user]);
 
   return (

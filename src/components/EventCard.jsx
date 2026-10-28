@@ -17,6 +17,13 @@ import {
   selectMemberActionLoadingId,
 } from "../redux/slice/eventMemberSlice";
 
+import {
+  saveEvent,
+  unsaveEvent,
+  selectSavedIds,
+  selectSavedActionLoadingId,
+} from "../redux/slice/savedEventSlice";
+
 const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
 
 function resolveImageUrl(path) {
@@ -29,52 +36,33 @@ function resolveImageUrl(path) {
   return `${API_URL}/${String(path).replace(/^\/+/, "")}`;
 }
 
-function readStoredEvents(key) {
-  try {
-    const data = JSON.parse(localStorage.getItem(key) || "[]");
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
 function EventCard({
   event,
   onAuthRequired = () => {},
   onEventClick = () => {},
-  onSavedChange = () => {},
 }) {
-  const dispatch = useDispatch();
-
   const eventId = event.event_id ?? event.id;
+  const dispatch = useDispatch();
+  const savedIds = useSelector(selectSavedIds);
+  const savingId = useSelector(selectSavedActionLoadingId);
+  const saved = savedIds.includes(String(eventId));
+  const saving = savingId !== null && String(savingId) === String(eventId);
   const token = localStorage.getItem("token");
-
   const joinedIds = useSelector(selectJoinedIds);
   const memberLoaded = useSelector(selectMemberLoaded);
   const memberLoading = useSelector(selectMemberLoading);
   const memberError = useSelector(selectMemberError);
   const actionLoadingId = useSelector(selectMemberActionLoadingId);
-
   const registered = joinedIds.includes(String(eventId));
   const registering = actionLoadingId === String(eventId);
-
-  const [saved, setSaved] = useState(() => {
-    return readStoredEvents("savedEvents").some(
-      (item) => String(item.event_id ?? item.id) === String(eventId),
-    );
-  });
-
   const [actionError, setActionError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
   const [attendeeDelta, setAttendeeDelta] = useState(0);
-
   const initialAttendees = Number(event.attendee_count ?? event.attendees ?? 0);
-
   const attendees = Math.max(
     0,
     (Number.isFinite(initialAttendees) ? initialAttendees : 0) + attendeeDelta,
   );
-
   const capacity = Number(event.capacity) || 0;
 
   const percentage =
@@ -92,29 +80,28 @@ function EventCard({
 
   const categories = Array.isArray(event.categories) ? event.categories : [];
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.stopPropagation();
 
-    const savedEvents = readStoredEvents("savedEvents");
+    if (eventId == null || saving) return;
 
-    const alreadySaved = savedEvents.some(
-      (item) => String(item.event_id ?? item.id) === String(eventId),
-    );
+    const token = localStorage.getItem("token");
 
-    const updatedEvents = alreadySaved
-      ? savedEvents.filter(
-          (item) => String(item.event_id ?? item.id) !== String(eventId),
-        )
-      : [...savedEvents, event];
+    if (!token) {
+      onAuthRequired(event);
+      return;
+    }
+
+    setActionError("");
 
     try {
-      localStorage.setItem("savedEvents", JSON.stringify(updatedEvents));
-
-      setSaved(!alreadySaved);
-      onSavedChange(event, !alreadySaved);
-      setActionError("");
-    } catch {
-      setActionError("Failed to save event.");
+      if (saved) {
+        await dispatch(unsaveEvent(eventId)).unwrap();
+      } else {
+        await dispatch(saveEvent(event)).unwrap();
+      }
+    } catch (error) {
+      setActionError(error.message || "Failed to update saved event.");
     }
   }
 
@@ -216,7 +203,7 @@ function EventCard({
           <div className="flex min-w-0 items-start gap-2 text-sm text-gray-secondary">
             <FaLocationPin className="mt-0.5 shrink-0" />
 
-            <p className="min-w-0 break-words">
+            <p className="min-w-0 wrap-break-word">
               {event.location || (event.format === "online" ? "Online" : "-")}
             </p>
           </div>
@@ -287,6 +274,7 @@ function EventCard({
             <button
               type="button"
               onClick={handleSave}
+              disabled={saving}
               aria-label={saved ? "Unsave event" : "Save event"}
               title={saved ? "Unsave event" : "Save event"}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 dark:border-zinc-700 dark:hover:bg-zinc-800"

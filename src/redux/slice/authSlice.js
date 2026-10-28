@@ -1,5 +1,4 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-
 import { getProfileAPI, updateProfileAPI } from "../../services/profileService";
 
 export const fetchProfile = createAsyncThunk(

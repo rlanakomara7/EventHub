@@ -3,6 +3,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./slice/authSlice";
 import eventReducer from "./slice/eventSlice";
 import eventMemberReducer from "./slice/eventMemberSlice";
+import savedEventReducer from "./slice/savedEventSlice";
 
 import {
   persistStore,
@@ -32,6 +33,7 @@ export const store = configureStore({
     auth: persistedAuthReducer,
     events: eventReducer,
     eventMember: eventMemberReducer,
+    savedEvent: savedEventReducer,
   },
 
   middleware: (getDefaultMiddleware) =>

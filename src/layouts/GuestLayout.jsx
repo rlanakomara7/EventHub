@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { fetchSavedEvents } from "../redux/slice/savedEventSlice";
 
 import { selectUser } from "../redux/slice/authSlice";
 import { fetchJoinedEvents } from "../redux/slice/eventMemberSlice";
@@ -18,9 +19,13 @@ function GuestLayout() {
   useEffect(() => {
     if (!currentUser) return;
 
-    const request = dispatch(fetchJoinedEvents());
+    const joinedRequest = dispatch(fetchJoinedEvents());
+    const savedRequest = dispatch(fetchSavedEvents());
 
-    return () => request.abort();
+    return () => {
+      joinedRequest.abort();
+      savedRequest.abort();
+    };
   }, [dispatch, currentUser]);
 
   function handleGlobalJoin() {
