@@ -1,14 +1,9 @@
 import { Link, useParams } from "react-router";
-import {
-  FiCalendar,
-  FiClock,
-  FiMapPin,
-  FiUsers,
-  FiMessageCircle,
-} from "react-icons/fi";
+import { FiCalendar, FiClock, FiMapPin, FiUsers } from "react-icons/fi";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { selectUser } from "../../redux/slice/authSlice";
+import EventDiscussion from "../../components/EventDiscussion";
 
 import {
   joinEvent,
@@ -77,16 +72,21 @@ function EventDetail() {
     (joinedId) => String(joinedId) === String(id),
   );
 
-  //  Data Event Detail dari PostgreSQL
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [imageFailed, setImageFailed] = useState(false);
-
-  //  State pendaftaran melalui backend
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState("");
   const [shareMessage, setShareMessage] = useState("");
+
+  useEffect(() => {
+    if (!user || !localStorage.getItem("token")) return;
+
+    const request = dispatch(fetchJoinedEvents());
+
+    return () => request.abort();
+  }, [dispatch, user]);
 
   //  GET /api/events/:id
   useEffect(() => {
@@ -261,8 +261,6 @@ function EventDetail() {
 
   const speakers = Array.isArray(event.speakers) ? event.speakers : [];
 
-  const discussions = Array.isArray(event.discussions) ? event.discussions : [];
-
   const bannerUrl = resolveImageUrl(event.banner_url);
 
   const isFull =
@@ -395,49 +393,13 @@ function EventDetail() {
             </section>
 
             {/* DISCUSSION */}
-            <section className="mt-7">
-              <h2 className="flex items-center gap-2 font-semibold">
-                <FiMessageCircle />
-                Discussion
-                <span className="text-sm font-normal text-gray-secondary">
-                  ({discussions.length})
-                </span>
-              </h2>
-
-              {discussions.length > 0 ? (
-                <div className="mt-3 space-y-3">
-                  {discussions.map((item, index) => (
-                    <div
-                      key={item.discussion_id ?? index}
-                      className="rounded-xl border border-gray-200 p-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium">
-                          {item.name || "User"}
-                        </p>
-
-                        <span className="text-xs text-gray-secondary">
-                          {item.created_at || ""}
-                        </span>
-                      </div>
-
-                      <p className="mt-1 text-sm text-gray-secondary">
-                        {item.message}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-gray-secondary">
-                  No discussions yet.
-                </p>
-              )}
-
-              <p className="mt-4 text-xs text-gray-secondary">
-                Posting discussions will be available after the discussion API
-                is connected.
-              </p>
-            </section>
+            {/* DISCUSSION */}
+            <EventDiscussion
+              eventId={event.event_id}
+              joined={registered}
+              membershipLoading={memberLoading}
+              user={user}
+            />
           </div>
 
           {/* RIGHT SIDEBAR */}
