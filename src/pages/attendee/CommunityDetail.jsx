@@ -2,18 +2,22 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { MdPeopleAlt } from "react-icons/md";
-import { FiCalendar, FiMapPin, FiSend } from "react-icons/fi";
+import { FiCalendar, FiMapPin } from "react-icons/fi";
 
 import EventCard from "../../components/EventCard";
+import CommunityMembers from "../../components/CommunityMembers";
+import CommunityDiscussion from "../../components/CommunityDiscussion";
+
 import { getCommunities } from "../../services/communityService";
+
 import {
   getExploreEvents,
   getExploreCommunities,
   resolveMediaUrl,
 } from "../../services/exploreService";
-import CommunityMembers from "../../components/CommunityMembers";
 
 import { selectUser } from "../../redux/slice/authSlice";
+
 import {
   fetchCommunityMemberships,
   toggleCommunityMembership,
@@ -286,13 +290,8 @@ function CommunityDetail() {
     )
     .filter(Boolean);
 
-  const discussions = Array.isArray(community.discussions)
-    ? community.discussions
-    : [];
-
   return (
     <div className="min-h-screen bg-[#fafafa] dark:bg-zinc-950">
-      {/* BACK */}
       <div className="border-b border-gray-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900 md:px-10">
         <Link
           to="/communities"
@@ -302,7 +301,6 @@ function CommunityDetail() {
         </Link>
       </div>
 
-      {/* HERO / BANNER */}
       <section className="relative h-52 w-full overflow-hidden bg-gray-200 sm:h-60 md:h-72">
         {bannerUrl && !bannerFailed ? (
           <img
@@ -362,7 +360,6 @@ function CommunityDetail() {
         </div>
       </section>
 
-      {/* DESCRIPTION */}
       <div className="mx-auto max-w-6xl px-4 pt-5 md:px-6">
         <div className="rounded-xl border border-gray-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <p className="text-sm leading-6 text-gray-secondary">
@@ -390,9 +387,7 @@ function CommunityDetail() {
         </div>
       </div>
 
-      {/* CONTENT */}
       <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-5 md:px-6">
-        {/* TABS */}
         <div className="border-b border-gray-200 dark:border-zinc-800">
           <div className="flex gap-7">
             {["Events", "Members", "Discussion"].map((tab) => (
@@ -412,7 +407,6 @@ function CommunityDetail() {
           </div>
         </div>
 
-        {/* EVENTS */}
         {activeTab === "Events" && (
           <section className="mt-6">
             <h2 className="mb-4 text-xs font-semibold tracking-wide text-gray-secondary">
@@ -457,7 +451,6 @@ function CommunityDetail() {
           </section>
         )}
 
-        {/* MEMBERS */}
         {activeTab === "Members" && (
           <section className="mt-6">
             <CommunityMembers
@@ -468,76 +461,14 @@ function CommunityDetail() {
           </section>
         )}
 
-        {/* DISCUSSION */}
         {activeTab === "Discussion" && (
-          <section className="mt-6">
-            <div className="flex items-center gap-3">
-              <img
-                src="/Default-Avatar.svg"
-                alt=""
-                className="h-9 w-9 shrink-0 rounded-full object-cover"
-              />
-
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900">
-                <input
-                  type="text"
-                  disabled
-                  placeholder="Community discussions will be available soon..."
-                  className="min-w-0 flex-1 bg-transparent py-3 text-sm text-gray-secondary outline-none"
-                />
-
-                <button
-                  type="button"
-                  disabled
-                  aria-label="Send discussion"
-                  className="shrink-0 text-orange-primary opacity-40"
-                >
-                  <FiSend />
-                </button>
-              </div>
-            </div>
-
-            {discussions.length === 0 ? (
-              <div className="mt-5 rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-sm text-gray-secondary">
-                  No community discussions yet.
-                </p>
-              </div>
-            ) : (
-              <div className="mt-5 space-y-3">
-                {discussions.map((item, index) => (
-                  <div
-                    key={item.discussion_id ?? item.id ?? index}
-                    className="flex items-start gap-3"
-                  >
-                    <img
-                      src={resolveMediaUrl(
-                        item.avatar_url || "/Default-Avatar.svg",
-                      )}
-                      alt=""
-                      className="h-9 w-9 shrink-0 rounded-full object-cover"
-                    />
-
-                    <div className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold">
-                          {item.name || item.user || "Member"}
-                        </span>
-
-                        <span className="text-xs text-gray-secondary">
-                          {item.created_at || item.time || ""}
-                        </span>
-                      </div>
-
-                      <p className="mt-1 break-words text-sm leading-6 text-gray-secondary">
-                        {item.message || item.text || ""}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+          <CommunityDiscussion
+            key={id}
+            communityId={id}
+            joined={joined}
+            membershipLoading={membershipLoading}
+            user={user}
+          />
         )}
       </main>
     </div>
