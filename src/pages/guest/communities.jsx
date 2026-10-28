@@ -1,21 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
+
 import CommunityHero from "../../components/CommunityHero";
 import CommunityFilter from "../../components/CommunityFilter";
 import CommunityList from "../../components/CommunityList";
 import ModalSign from "../../components/ModalSign";
+
 import { getCommunities } from "../../services/communityService";
-import { joinCommunity, leaveCommunity } from "../../services/communityService";
 
 function Communities() {
   const [showModal, setShowModal] = useState(false);
   const [search, setSearch] = useState("");
+
+  const [selectedStatus, setSelectedStatus] = useState("All");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedLocation, setSelectedLocation] = useState("All Locations");
 
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Status join terbaru dari Redux.
+  const membershipById = useSelector((state) => state.communityMember.byId);
+
+  // Ambil komunitas berdasarkan pencarian dan kategori.
   useEffect(() => {
     const controller = new AbortController();
 
@@ -34,8 +41,8 @@ function Communities() {
           setCommunities(data);
         }
       } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message);
+        if (!controller.signal.aborted) {
+          setError(err.message || "Failed to load communities.");
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -50,38 +57,27 @@ function Communities() {
     };
   }, [search, selectedCategory]);
 
-  const communityCards = communities.map((community) => ({
-    id: community.community_id,
-    name: community.name,
-    description: community.description || "",
-    image: community.banner_url || "/C-Image(BandungGoCommunity).svg",
-    category: community.categories?.join(", ") || "—",
-    members: community.member_count ?? 0,
-    upcomingEvents: community.upcoming_count ?? 0,
-    isJoined: community.is_joined === true,
-  }));
+  // Filter status keanggotaan.
+  const filteredCommunities = useMemo(() => {
+    return communities.filter((community) => {
+      const id = String(community.community_id ?? community.id);
 
-  function handleJoin() {
-    if (!localStorage.getItem("token")) {
-      setShowModal(true);
-    }
-  }
+      const joined = membershipById[id] ?? community.is_joined === true;
 
-  async function handleJoinChange(community) {
-    try {
-      if (community.isJoined) {
-        await leaveCommunity(community.id);
-      } else {
-        await joinCommunity(community.id);
+      if (selectedStatus === "Joined") {
+        return joined;
       }
-    } catch (error) {
-      if (!error.message?.includes("already joined community")) {
-        throw error;
-      }
-    }
 
-    const latest = await getCommunities(search, selectedCategory);
-    setCommunities(latest);
+      if (selectedStatus === "Not Joined") {
+        return !joined;
+      }
+
+      return true;
+    });
+  }, [communities, selectedStatus, membershipById]);
+
+  function handleAuthRequired() {
+    setShowModal(true);
   }
 
   return (
@@ -89,37 +85,30 @@ function Communities() {
       <CommunityHero search={search} setSearch={setSearch} />
 
       <CommunityFilter
+        selectedStatus={selectedStatus}
+        setSelectedStatus={setSelectedStatus}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
-        selectedLocation={selectedLocation}
-        setSelectedLocation={setSelectedLocation}
       />
 
-      <div className="px-3 md:px-6 lg:px-12">
+      <div className="px-6">
         <p className="text-sm font-bold md:text-base">
-          {communityCards.length}{" "}
-          <span className="font-medium text-gray-primary/40">Communities</span>
+          {loading ? 0 : filteredCommunities.length}{" "}
+          <span className="font-medium text-gray-primary/40">communities</span>
         </p>
       </div>
 
-      {selectedLocation !== "All Locations" && (
-        <p className="px-6 text-sm text-orange-primary">
-          Filter lokasi belum tersedia.
-        </p>
-      )}
-
-      <div className="px-12">
+      <div className="px-6">
         {loading ? (
           <p className="py-10 text-center">Loading communities...</p>
         ) : error ? (
           <p className="py-10 text-center text-red-500">{error}</p>
-        ) : communityCards.length === 0 ? (
+        ) : filteredCommunities.length === 0 ? (
           <p className="py-10 text-center">No communities found.</p>
         ) : (
           <CommunityList
-            communities={communityCards}
-            onAuthRequired={handleJoin}
-            onJoinChange={handleJoinChange}
+            communities={filteredCommunities}
+            onAuthRequired={handleAuthRequired}
           />
         )}
       </div>

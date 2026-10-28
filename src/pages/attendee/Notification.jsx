@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+
 import {
   FiBell,
   FiCalendar,
@@ -9,69 +10,29 @@ import {
   FiUsers,
 } from "react-icons/fi";
 
-const defaultNotifications = [
-  {
-    id: 1,
-    type: "event",
-    title: "Go Concurrency Workshop starts in 2 days",
-    message:
-      "Don't forget your registered event on Aug 23 at 09:00 in Bandung.",
-    time: "2h ago",
-    read: false,
-    path: "/event/1",
-  },
-  {
-    id: 2,
-    type: "register",
-    title: "Registration confirmed",
-    message: "You're registered for Frontend Craft Conference on Oct 12, 2026.",
-    time: "3h ago",
-    read: false,
-    path: "/event/3",
-  },
-  {
-    id: 3,
-    type: "community",
-    title: "New event in Bandung Go Community",
-    message: "Rizky posted a new event in the community.",
-    time: "1d ago",
-    read: false,
-    path: "/communities/1",
-  },
-  {
-    id: 4,
-    type: "update",
-    title: "Update: AI Product Design Summit",
-    message: "The event schedule has been updated.",
-    time: "2d ago",
-    read: true,
-    path: "/event/2",
-  },
-  {
-    id: 5,
-    type: "discussion",
-    title: "Reply to your discussion",
-    message: "Ahmad Fauzan replied to your question.",
-    time: "3d ago",
-    read: true,
-    path: "/event/1",
-  },
-];
+import {
+  getNotificationsAPI,
+  markNotificationReadAPI,
+  markAllNotificationsReadAPI,
+} from "../../services/notificationService";
 
-function readNotifications() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("notifications"));
+// Format waktu dari database.
+function formatTime(value) {
+  if (!value) return "";
 
-    if (Array.isArray(saved)) {
-      return saved;
-    }
-  } catch {
-    // Gunakan data awal jika localStorage rusak
-  }
+  const date = new Date(value);
 
-  return defaultNotifications;
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
+// Ikon mengikuti tipe notifikasi.
 function NotificationIcon({ type }) {
   const icons = {
     event: <FiCalendar />,
@@ -87,52 +48,110 @@ function NotificationIcon({ type }) {
 function Notification() {
   const navigate = useNavigate();
 
-  const [notifications, setNotifications] = useState(readNotifications);
+  const [notifications, setNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState("all");
 
-  const unreadCount = notifications.filter(
-    (notification) => !notification.read,
-  ).length;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [markingAll, setMarkingAll] = useState(false);
+  const [openingId, setOpeningId] = useState(null);
+
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadNotifications() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await getNotificationsAPI(controller.signal);
+
+        if (!controller.signal.aborted) {
+          setNotifications(data);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          setError(err.message || "Failed to load notifications.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadNotifications();
+
+    return () => controller.abort();
+  }, [refresh]);
+
+  const unreadCount = notifications.filter((item) => !item.read).length;
 
   const displayedNotifications =
     activeTab === "unread"
-      ? notifications.filter((notification) => !notification.read)
+      ? notifications.filter((item) => !item.read)
       : notifications;
 
-  function saveNotifications(updatedNotifications) {
-    localStorage.setItem("notifications", JSON.stringify(updatedNotifications));
+  async function handleMarkAllRead() {
+    if (markingAll || unreadCount === 0) return;
 
-    setNotifications(updatedNotifications);
+    setMarkingAll(true);
+    setActionError("");
+
+    try {
+      await markAllNotificationsReadAPI();
+
+      setNotifications((previous) =>
+        previous.map((item) => ({
+          ...item,
+          read: true,
+        })),
+      );
+    } catch (err) {
+      setActionError(err.message || "Failed to mark notifications.");
+    } finally {
+      setMarkingAll(false);
+    }
   }
 
-  function handleMarkAllRead() {
-    const updatedNotifications = notifications.map((notification) => ({
-      ...notification,
-      read: true,
-    }));
+  async function handleNotificationClick(notification) {
+    if (openingId !== null) return;
 
-    saveNotifications(updatedNotifications);
-  }
+    setOpeningId(notification.id);
+    setActionError("");
 
-  function handleNotificationClick(notification) {
-    const updatedNotifications = notifications.map((item) =>
-      item.id === notification.id ? { ...item, read: true } : item,
-    );
+    try {
+      if (!notification.read) {
+        await markNotificationReadAPI(notification.id);
 
-    saveNotifications(updatedNotifications);
+        setNotifications((previous) =>
+          previous.map((item) =>
+            item.id === notification.id ? { ...item, read: true } : item,
+          ),
+        );
+      }
 
-    if (notification.path) {
-      navigate(notification.path);
+      if (/^\/(event|communities)\/\d+$/.test(notification.path)) {
+        navigate(notification.path);
+      }
+    } catch (err) {
+      setActionError(err.message || "Failed to open notification.");
+    } finally {
+      setOpeningId(null);
     }
   }
 
   return (
-    <main className="min-h-screen bg-white-secondary">
+    <main className="min-h-screen bg-white-secondary dark:bg-zinc-950">
       <div className="mx-auto max-w-4xl px-5 py-8">
-        <div className="flex items-start justify-between">
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Notifications
               </h1>
 
@@ -151,12 +170,14 @@ function Notification() {
           <button
             type="button"
             onClick={handleMarkAllRead}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+            disabled={markingAll || loading || unreadCount === 0}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
           >
-            Mark all as read
+            {markingAll ? "Processing..." : "Mark all as read"}
           </button>
         </div>
 
+        {/* FILTER */}
         <div className="mt-5 flex gap-2 border-b border-gray-200">
           <button
             type="button"
@@ -183,33 +204,64 @@ function Notification() {
           </button>
         </div>
 
-        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white">
-          {displayedNotifications.length === 0 ? (
-            <div className="p-8 text-center text-sm text-gray-secondary">
-              No notifications.
+        {/* ERROR */}
+        {actionError && (
+          <p role="alert" className="mt-3 text-sm text-red-600">
+            {actionError}
+          </p>
+        )}
+
+        {/* NOTIFICATION LIST */}
+        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-zinc-700 dark:bg-zinc-900">
+          {loading ? (
+            <p className="p-8 text-center text-sm text-gray-secondary">
+              Loading notifications...
+            </p>
+          ) : error ? (
+            <div className="p-8 text-center">
+              <p role="alert" className="text-sm text-red-600">
+                {error}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setRefresh((value) => value + 1)}
+                className="mt-2 text-sm text-orange-primary underline"
+              >
+                Try Again
+              </button>
             </div>
+          ) : displayedNotifications.length === 0 ? (
+            <p className="p-8 text-center text-sm text-gray-secondary">
+              No notifications.
+            </p>
           ) : (
             displayedNotifications.map((notification) => (
               <button
                 key={notification.id}
                 type="button"
+                disabled={openingId !== null}
                 onClick={() => handleNotificationClick(notification)}
-                className={`flex w-full items-start gap-3 border-b border-gray-100 p-4 text-left last:border-b-0 hover:bg-gray-50 ${
-                  !notification.read ? "bg-orange-50/40" : "bg-white"
+                className={`flex w-full items-start gap-3 border-b border-gray-100 p-4 text-left last:border-b-0 hover:bg-gray-50 disabled:opacity-60 dark:border-zinc-700 dark:hover:bg-zinc-800 ${
+                  !notification.read
+                    ? "bg-orange-50/40 dark:bg-orange-950/20"
+                    : "bg-white dark:bg-zinc-900"
                 }`}
               >
+                {/* ICON */}
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100 text-orange-primary">
                   <NotificationIcon type={notification.type} />
                 </span>
 
+                {/* CONTENT */}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-3">
-                    <span className="text-sm font-semibold text-gray-900">
+                    <span className="text-sm font-semibold text-gray-900 dark:text-white">
                       {notification.title}
                     </span>
 
                     <span className="shrink-0 text-xs text-gray-400">
-                      {notification.time}
+                      {formatTime(notification.created_at)}
                     </span>
                   </span>
 
@@ -218,6 +270,7 @@ function Notification() {
                   </span>
                 </span>
 
+                {/* UNREAD INDICATOR */}
                 {!notification.read && (
                   <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-orange-primary" />
                 )}
