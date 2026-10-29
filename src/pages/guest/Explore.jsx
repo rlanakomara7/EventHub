@@ -115,13 +115,13 @@ function Explore() {
 
       <main className="mx-auto w-full px-5 md:px-14">
         <section>
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-3 sm:items-center">
             {role === "attendee" ? (
               <div className="mb-6">
                 <p className="mb-1 text-sm font-semibold uppercase text-orange-primary">
                   ↗ Discover Your Next Event
                 </p>
-                <p className="text-lg font-bold md:text-2xl">
+                <p className="text-base font-bold leading-snug sm:text-lg md:text-2xl">
                   Events you might be interested in
                 </p>
               </div>
@@ -134,7 +134,7 @@ function Explore() {
             <button
               type="button"
               onClick={() => navigate("/event")}
-              className="text-sm text-slate-400 hover:text-orange-primary"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm text-slate-400 hover:text-orange-primary"
             >
               See all →
             </button>
@@ -183,7 +183,7 @@ function Explore() {
             <button
               type="button"
               onClick={() => navigate("/communities")}
-              className="text-sm text-slate-400 hover:text-orange-primary"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm text-slate-400 hover:text-orange-primary"
             >
               See all →
             </button>
