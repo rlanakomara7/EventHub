@@ -1,7 +1,9 @@
 import { Link, useNavigate, NavLink } from "react-router";
 import { FiBell, FiMenu, FiX, FiShield } from "react-icons/fi";
 import { RxDashboard } from "react-icons/rx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
+import { getNotificationsAPI } from "../services/notificationService";
 
 import MobileMenu from "./MobileMenu";
 import ModalLogout from "./ModalLogout";
@@ -17,6 +19,46 @@ function Header() {
   const dispatch = useAppDispatch();
 
   const currentUser = useAppSelector((state) => state.auth.user);
+
+  const { pathname } = useLocation();
+
+  const [hasUnread, setHasUnread] = useState(false);
+
+  const isLoggedIn = Boolean(currentUser);
+  const userId = currentUser?.user_id ?? currentUser?.id;
+
+  useEffect(() => {
+    if (!isLoggedIn || !localStorage.getItem("token")) {
+      return;
+    }
+
+    let active = true;
+
+    async function checkNotifications() {
+      try {
+        const notifications = await getNotificationsAPI();
+
+        if (active) {
+          setHasUnread(notifications.some((item) => !item.read));
+        }
+      } catch {
+        // Tidak mengganggu tampilan Header jika request gagal.
+      }
+    }
+
+    checkNotifications();
+
+    const interval = setInterval(checkNotifications, 30000);
+    window.addEventListener("focus", checkNotifications);
+    window.addEventListener("notifications-updated", checkNotifications);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", checkNotifications);
+      window.removeEventListener("notifications-updated", checkNotifications);
+    };
+  }, [isLoggedIn, userId, pathname]);
 
   const [logoutModal, setLogoutModal] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -161,11 +203,20 @@ function Header() {
                   }
                 >
                   {({ isActive }) => (
-                    <FiBell
-                      className={`h-5 w-5 ${
-                        isActive ? "text-orange-primary" : ""
-                      }`}
-                    />
+                    <>
+                      <FiBell
+                        className={`h-5 w-5 ${
+                          isActive ? "text-orange-primary" : ""
+                        }`}
+                      />
+
+                      {hasUnread && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-orange-primary ring-2 ring-white dark:ring-zinc-900"
+                        />
+                      )}
+                    </>
                   )}
                 </NavLink>
 
@@ -227,9 +278,16 @@ function Header() {
               <NavLink
                 to="/notification"
                 aria-label="Open notifications"
-                className="text-gray-primary dark:text-zinc-300"
+                className="relative inline-flex rounded-lg p-2 text-gray-primary dark:text-zinc-300"
               >
                 <FiBell className="h-5 w-5" />
+
+                {hasUnread && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-orange-primary ring-2 ring-white dark:ring-zinc-900"
+                  />
+                )}
               </NavLink>
             )}
 

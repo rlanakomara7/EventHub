@@ -110,6 +110,7 @@ function Notification() {
           read: true,
         })),
       );
+      window.dispatchEvent(new Event("notifications-updated"));
     } catch (err) {
       setActionError(err.message || "Failed to mark notifications.");
     } finally {
@@ -132,6 +133,7 @@ function Notification() {
             item.id === notification.id ? { ...item, read: true } : item,
           ),
         );
+        window.dispatchEvent(new Event("notifications-updated"));
       }
 
       if (/^\/(event|communities)\/\d+$/.test(notification.path)) {
