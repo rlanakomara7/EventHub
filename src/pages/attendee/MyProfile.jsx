@@ -284,7 +284,7 @@ function MyProfile() {
               </span>
             </div>
 
-            <p className="mt-3 max-w-xl leading-relaxed text-gray-600">
+            <p className="mt-3 max-w-xl leading-relaxed text-gray-600 dark:text-zinc-400">
               {user?.bio || "Belum ada informasi bio."}
             </p>
           </div>
@@ -305,7 +305,7 @@ function MyProfile() {
           <p className="text-gray-500">Events</p>
         </div>
 
-        <div className="border-x border-gray-300">
+        <div className="border-x border-gray-300 dark:border-zinc-700">
           <h3 className="text-2xl font-bold">{joinedCommunities.length}</h3>
           <p className="text-gray-500">Communities</p>
         </div>
@@ -322,7 +322,7 @@ function MyProfile() {
         <MyProfileFilter activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
 
-      <section className="min-h-screen bg-white-secondary py-6">
+      <section className="min-h-screen bg-white-secondary py-6 transition-colors duration-300 dark:bg-zinc-950">
         <div className="mx-auto max-w-6xl px-6">
           {activeTab === "events" && (
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
